@@ -1,113 +1,97 @@
+# Structure-Aware GNN Knowledge Distillation
 
-# Graph Convolutional Networks (GCN) with vanilla Knowledge Distillation
+This repository contains the implementation for **Graph Neural Network Knowledge Distillation** research, focusing on transferring knowledge from GCN (Teacher) to MLP (Student) for node classification tasks.
 
-  
+## Project Overview
 
-This is the Pytorch implementation of Teacher-Student architecture (proposed by [[Hinton et al. 2015]](https://arxiv.org/abs/1503.02531)) using Graph Convolutional Network (GCN) as a base model. The GCN code is adpated from [Kipf's PyGCN](https://github.com/tkipf/pygcn).
+Knowledge Distillation (KD) enables lightweight MLP models to learn from powerful GNN models, achieving competitive performance without requiring graph structure during inference.
 
-  
+### Key Features
+- **Teacher Model**: 2-layer Graph Convolutional Network (GCN)
+- **Student Model**: 2-layer Multi-Layer Perceptron (MLP)
+- **Datasets**: Cora, Citeseer, PubMed, Amazon-Computers, Amazon-Photo
 
-Due to a lack of source codes of knowledge distillation relating to GCN, the vanilla implementation might be helpful for the research community.
+## Installation
 
-  
+```bash
+# Clone the repository
+git clone https://github.com/kai666-song/Structure-Aware-GNN-Distillation.git
+cd Structure-Aware-GNN-Distillation
 
-### Dependencies
+# Install dependencies
+pip install torch numpy scipy networkx torch_geometric
+```
 
-  
+## Usage
 
-- Compatible with PyTorch 1.4.0 and Python 3.7.3.
+### Run Baseline Benchmark (Step 1)
+```bash
+# Single dataset
+python benchmark.py --data cora --epochs 200 --num_runs 10
 
+# All datasets
+python benchmark.py --all --epochs 200 --num_runs 10
+```
 
-### Environment
-
-  
-
-- The implementation is supposed to train in the GPU enviornment.
-
-- We test all of the datasets on GeForce RTX 2080 Ti and CPU with 128GB RAM.
-
-  
-
-### Dataset:
-
-  
-
-- To fully fit the KD loss function, we run GCN with CORA, CITECEER, and PUBMED as benchmark datasets for semi-supervised node classification.
-
-- CORA, CITECEER, and PUBMED are included in `data` directory. See details of dataset information in [[Sen et al. 2008]](https://ojs.aaai.org//index.php/aimagazine/article/view/2157)
-
-  
-
-### Result:
-
-The belows are node classification results with ten differnet random initializations. It is noted that both teacher and student model have identical settings (2-layer GCN).
-
-| acc(%) \ data | CORA | CITESEER | PUBMED |
-|----|----|----|----|
-| Teacher Model | 81.16±0.57 | 70.74±0.68 | 78.96±0.49 |
-| Student Model | 81.83±1.53 | 71.45±0.85 | 79.48±0.41 |
-  
-
-### Training scripts (node classification):
-
-  
-
-It is noted that the hyper-parameters below have not been fine-tuned yet, but they are good enough for testing the efficiency of knowlede distillation on GCN.
-
-- CORA:
-
-  
-
-```shell
-
+### Run Knowledge Distillation Training
+```bash
+# Cora with KD
 python run.py --data cora --dropout 0.7 --T 4.0 --lambda_kd 0.7
 
-```
+# Citeseer with KD
+python run.py --data citeseer --dropout 0.5 --T 3.0 --lambda_kd 0.7
 
-  
-
-- CITECEER:
-
-  
-
-```shell
-
-python run.py --data citeceer --dropout 0.5 --T 3.0 --lambda_kd 0.7
-
-```
-
-  
-
-- PUBMED:
-
-  
-
-```shell
-
+# PubMed with KD
 python run.py --data pubmed --dropout 0.7 --T 6.0 --lambda_kd 0.8
-
 ```
 
-  
+## Baseline Results (Step 1)
 
-Note: Results depend on random seed and will vary between re-runs.
+| Dataset | GCN (Teacher) | MLP (Student) | Gap |
+|---------|---------------|---------------|-----|
+| Cora | 81.09 ± 0.28 | 60.09 ± 0.44 | 21.00 |
+| Citeseer | 71.30 ± 0.33 | 59.87 ± 0.41 | 11.43 |
+| PubMed | 79.39 ± 0.23 | 73.28 ± 0.28 | 6.11 |
+| Amazon-Computers | 63.35 ± 1.17 | 60.28 ± 2.08 | 3.07 |
+| Amazon-Photo | 79.09 ± 2.10 | 76.10 ± 1.05 | 2.99 |
 
-  
+*Settings: epochs=200, hidden=64, lr=0.01, dropout=0.5, runs=10*
 
--  `--seed` denotes the manual seed for model training
+## Project Structure
 
--  `--data` denotes training datasets
+```
+├── benchmark.py          # Baseline benchmark script
+├── train.py              # Training logic with KD
+├── run.py                # Main entry point
+├── models.py             # GCN and MLP model definitions
+├── layers.py             # Graph convolution layer
+├── params.py             # Hyperparameter settings
+├── kd_losses/            # Knowledge distillation loss functions
+│   ├── __init__.py
+│   └── st.py             # Soft Target loss
+├── utils/                # Utility functions
+│   ├── __init__.py
+│   ├── data_utils.py     # Data loading (Planetoid + Amazon/Coauthor)
+│   └── utils.py          # Helper functions
+├── data/                 # Dataset files
+└── results/              # Experiment results
+    └── step1_baseline_results.md
+```
 
--  `--hidden` is the dimension of hidden GCN Layers
+## Requirements
 
--  `--lr` denotes learning rate
+- Python >= 3.7
+- PyTorch >= 1.4.0
+- torch_geometric
+- numpy
+- scipy
+- networkx
 
--  `--l2` is the weight decay parameter of L2 regularization
+## References
 
--  `--dropout` is the dropout value for training GCN Layers
+- [Hinton et al. 2015] Distilling the Knowledge in a Neural Network
+- [Kipf & Welling 2017] Semi-Supervised Classification with Graph Convolutional Networks
 
--  `--T` is the tempoerature for KD loss of soft targets
+## License
 
--  `--lambda_kd` is the hyper-parameter of KD loss.
-
-- Rest of the arguments can be listed using `python run.py -h`
+MIT License

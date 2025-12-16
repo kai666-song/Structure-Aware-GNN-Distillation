@@ -4,7 +4,6 @@
 # Compiled python
 *.pyc
 *.pyd
-
 __pycache__/
 
 # Model checkpoints
@@ -15,7 +14,16 @@ __pycache__/
 *.swo
 *.swp
 
-# Visual Studio Code files
-.vscode
-.vs
+# Visual Studio Code / IDE files
+.vscode/
+.vs/
+.idea/
+.kiro/
+
+# PyTorch Geometric downloaded data (can be re-downloaded)
+data/amazon/
+data/coauthor/
+
+# Logs
+*.log
 

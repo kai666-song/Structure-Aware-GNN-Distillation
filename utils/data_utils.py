@@ -1,16 +1,23 @@
-import  numpy as np
-import  pickle as pkl
-import  networkx as nx
-import  scipy.sparse as sp
-from    scipy.sparse.linalg.eigen.arpack import eigsh
-import  sys
+import numpy as np
+import pickle as pkl
+import networkx as nx
+import scipy.sparse as sp
+from scipy.sparse.linalg import eigsh
+import sys
 import torch
+
+# PyTorch Geometric imports for Amazon/Coauthor datasets
+try:
+    from torch_geometric.datasets import Amazon, Coauthor
+    from torch_geometric.transforms import RandomNodeSplit
+    HAS_PYG = True
+except ImportError:
+    HAS_PYG = False
+    print("Warning: torch_geometric not installed. Amazon/Coauthor datasets unavailable.")
 
 
 def parse_index_file(filename):
-    """
-    Parse index file.
-    """
+    """Parse index file."""
     index = []
     for line in open(filename):
         index.append(int(line.strip()))
@@ -18,33 +25,124 @@ def parse_index_file(filename):
 
 
 def sample_mask(idx, l):
-    """
-    Create mask.
-    """
+    """Create mask."""
     mask = np.zeros(l)
     mask[idx] = 1
-    return np.array(mask, dtype=np.bool)
+    return np.array(mask, dtype=np.bool_)
 
 
 def load_data_new(dataset_str):
     """
-    Loads input data from gcn/data directory
+    Loads input data from gcn/data directory or PyG datasets.
+    
+    Supports: cora, citeseer, pubmed, amazon-computers, amazon-photo, 
+              coauthor-cs, coauthor-physics
+    """
+    dataset_str = dataset_str.lower()
+    
+    # Check if it's an Amazon or Coauthor dataset
+    if dataset_str in ['amazon-computers', 'amazon-photo', 'computers', 'photo']:
+        return load_amazon_data(dataset_str)
+    elif dataset_str in ['coauthor-cs', 'coauthor-physics', 'cs', 'physics']:
+        return load_coauthor_data(dataset_str)
+    else:
+        # Original loading logic for cora, citeseer, pubmed
+        return load_planetoid_data(dataset_str)
 
-    ind.dataset_str.x => the feature vectors of the training instances as scipy.sparse.csr.csr_matrix object;
-    ind.dataset_str.tx => the feature vectors of the test instances as scipy.sparse.csr.csr_matrix object;
-    ind.dataset_str.allx => the feature vectors of both labeled and unlabeled training instances
-        (a superset of ind.dataset_str.x) as scipy.sparse.csr.csr_matrix object;
-    ind.dataset_str.y => the one-hot labels of the labeled training instances as numpy.ndarray object;
-    ind.dataset_str.ty => the one-hot labels of the test instances as numpy.ndarray object;
-    ind.dataset_str.ally => the labels for instances in ind.dataset_str.allx as numpy.ndarray object;
-    ind.dataset_str.graph => a dict in the format {index: [index_of_neighbor_nodes]} as collections.defaultdict
-        object;
-    ind.dataset_str.test.index => the indices of test instances in graph, for the inductive setting as list object.
 
-    All objects above must be saved using python pickle module.
+def load_amazon_data(dataset_str):
+    """Load Amazon dataset (Computers or Photo) using PyTorch Geometric."""
+    if not HAS_PYG:
+        raise ImportError("torch_geometric required for Amazon datasets. "
+                         "Install with: pip install torch_geometric")
+    
+    # Map dataset name
+    if dataset_str in ['amazon-computers', 'computers']:
+        name = 'Computers'
+    else:
+        name = 'Photo'
+    
+    # Load dataset with random split
+    transform = RandomNodeSplit(split='train_rest', num_val=0.1, num_test=0.2)
+    dataset = Amazon(root='./data/amazon', name=name, transform=transform)
+    data = dataset[0]
+    
+    return _convert_pyg_to_format(data)
 
-    :param dataset_str: Dataset name
-    :return: All data input files loaded (as well the training/test data).
+
+def load_coauthor_data(dataset_str):
+    """Load Coauthor dataset (CS or Physics) using PyTorch Geometric."""
+    if not HAS_PYG:
+        raise ImportError("torch_geometric required for Coauthor datasets. "
+                         "Install with: pip install torch_geometric")
+    
+    # Map dataset name
+    if dataset_str in ['coauthor-cs', 'cs']:
+        name = 'CS'
+    else:
+        name = 'Physics'
+    
+    # Load dataset with random split
+    transform = RandomNodeSplit(split='train_rest', num_val=0.1, num_test=0.2)
+    dataset = Coauthor(root='./data/coauthor', name=name, transform=transform)
+    data = dataset[0]
+    
+    return _convert_pyg_to_format(data)
+
+
+def _convert_pyg_to_format(data):
+    """Convert PyG data object to the format expected by the training code."""
+    # Get features and labels
+    features = data.x.numpy()
+    labels = data.y.numpy()
+    num_nodes = features.shape[0]
+    num_classes = int(labels.max()) + 1
+    
+    # Build adjacency matrix from edge_index
+    edge_index = data.edge_index.numpy()
+    adj = sp.coo_matrix(
+        (np.ones(edge_index.shape[1]), (edge_index[0], edge_index[1])),
+        shape=(num_nodes, num_nodes)
+    )
+    adj = adj.tocsr()
+    
+    # Get masks
+    train_mask = data.train_mask.numpy()
+    val_mask = data.val_mask.numpy()
+    test_mask = data.test_mask.numpy()
+    
+    idx_train = np.where(train_mask)[0]
+    idx_val = np.where(val_mask)[0]
+    idx_test = np.where(test_mask)[0]
+    
+    # Create one-hot labels
+    labels_onehot = np.zeros((num_nodes, num_classes))
+    labels_onehot[np.arange(num_nodes), labels] = 1
+    
+    y_train = np.zeros(labels_onehot.shape)
+    y_val = np.zeros(labels_onehot.shape)
+    y_test = np.zeros(labels_onehot.shape)
+    y_train[train_mask, :] = labels_onehot[train_mask, :]
+    y_val[val_mask, :] = labels_onehot[val_mask, :]
+    y_test[test_mask, :] = labels_onehot[test_mask, :]
+    
+    # Convert to sparse features
+    features = sp.lil_matrix(features)
+    
+    # Convert to torch tensors
+    labels_tensor = torch.LongTensor(labels)
+    idx_train = torch.LongTensor(idx_train)
+    idx_val = torch.LongTensor(idx_val)
+    idx_test = torch.LongTensor(idx_test)
+    
+    return adj, features, labels_tensor, y_train, y_val, y_test, train_mask, val_mask, test_mask, idx_train, idx_val, idx_test
+
+
+def load_planetoid_data(dataset_str):
+    """
+    Loads input data from gcn/data directory (original Planetoid format).
+    
+    Supports: cora, citeseer, pubmed
     """
     names = ['x', 'y', 'tx', 'ty', 'allx', 'ally', 'graph']
     objects = []
@@ -61,7 +159,6 @@ def load_data_new(dataset_str):
 
     if dataset_str == 'citeseer':
         # Fix citeseer dataset (there are some isolated nodes in the graph)
-        # Find isolated nodes, add them as zero-vecs into the right position
         test_idx_range_full = range(min(test_idx_reorder), max(test_idx_reorder)+1)
         tx_extended = sp.lil_matrix((len(test_idx_range_full), x.shape[1]))
         tx_extended[test_idx_range-min(test_idx_range), :] = tx
@@ -80,9 +177,6 @@ def load_data_new(dataset_str):
     idx_test = test_idx_range.tolist()
     idx_train = range(len(y))
     idx_val = range(len(y), len(y)+500)
-    
-    #print(len(idx_train))
-    #print(len(idx_val))
 
     train_mask = sample_mask(idx_train, labels.shape[0])
     val_mask = sample_mask(idx_val, labels.shape[0])
@@ -105,13 +199,11 @@ def load_data_new(dataset_str):
     idx_val = torch.LongTensor(idx_val)
     idx_test = torch.LongTensor(idx_test)
 
-    return adj, features,labels, y_train, y_val, y_test, train_mask, val_mask, test_mask, idx_train, idx_val, idx_test
+    return adj, features, labels, y_train, y_val, y_test, train_mask, val_mask, test_mask, idx_train, idx_val, idx_test
 
 
 def sparse_to_tuple(sparse_mx):
-    """
-    Convert sparse matrix to tuple representation.
-    """
+    """Convert sparse matrix to tuple representation."""
     def to_tuple(mx):
         if not sp.isspmatrix_coo(mx):
             mx = mx.tocoo()
@@ -130,45 +222,33 @@ def sparse_to_tuple(sparse_mx):
 
 
 def preprocess_features(features):
-    """
-    Row-normalize feature matrix and convert to tuple representation
-    """
-    rowsum = np.array(features.sum(1)) # get sum of each row, [2708, 1]
-    r_inv = np.power(rowsum, -1).flatten() # 1/rowsum, [2708]
-    r_inv[np.isinf(r_inv)] = 0. # zero inf data
-    r_mat_inv = sp.diags(r_inv) # sparse diagonal matrix, [2708, 2708]
-    features = r_mat_inv.dot(features) # D^-1:[2708, 2708]@X:[2708, 2708]
-    return sparse_to_tuple(features) # [coordinates, data, shape], []
+    """Row-normalize feature matrix and convert to tuple representation."""
+    rowsum = np.array(features.sum(1))
+    r_inv = np.power(rowsum, -1).flatten()
+    r_inv[np.isinf(r_inv)] = 0.
+    r_mat_inv = sp.diags(r_inv)
+    features = r_mat_inv.dot(features)
+    return sparse_to_tuple(features)
 
 
 def normalize_adj(adj):
     """Symmetrically normalize adjacency matrix."""
     adj = sp.coo_matrix(adj)
-    rowsum = np.array(adj.sum(1)) # D
-    #d_inv = np.power(rowsum, -1).flatten() # D^-1
-    #d_inv[np.isinf(d_inv)] = 0.
-    #d_inv = sp.diags(d_inv)
-    #return d_inv.dot(adj).tocoo() #D^-1
-    
-    d_inv_sqrt = np.power(rowsum, -0.5).flatten() # D^-0.5
+    rowsum = np.array(adj.sum(1))
+    d_inv_sqrt = np.power(rowsum, -0.5).flatten()
     d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.
-    d_mat_inv_sqrt = sp.diags(d_inv_sqrt) # D^-0.5
-    return adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt).tocoo() # D^-0.5AD^0.5
+    d_mat_inv_sqrt = sp.diags(d_inv_sqrt)
+    return adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt).tocoo()
 
 
 def preprocess_adj(adj):
-    """Preprocessing of adjacency matrix for simple GCN model and conversion to tuple representation."""
+    """Preprocessing of adjacency matrix for simple GCN model."""
     adj_normalized = normalize_adj(adj + sp.eye(adj.shape[0]))
     return sparse_to_tuple(adj_normalized)
 
 
-
-
-
 def chebyshev_polynomials(adj, k):
-    """
-    Calculate Chebyshev polynomials up to order k. Return a list of sparse matrices (tuple representation).
-    """
+    """Calculate Chebyshev polynomials up to order k."""
     print("Calculating Chebyshev polynomials up to order {}...".format(k))
 
     adj_normalized = normalize_adj(adj)

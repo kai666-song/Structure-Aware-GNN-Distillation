@@ -1,0 +1,8 @@
+# Core dependencies
+torch>=1.4.0
+numpy
+scipy
+networkx
+
+# For Amazon and Coauthor datasets
+torch_geometric
