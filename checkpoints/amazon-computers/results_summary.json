@@ -1,0 +1,73 @@
+{
+  "dataset": "amazon-computers",
+  "config": {
+    "alpha": 1.0,
+    "beta": 1.0,
+    "gamma": 1.0,
+    "temperature": 4.0,
+    "lr": 0.01,
+    "weight_decay": 0,
+    "hidden": 256,
+    "dropout": 0.5,
+    "epochs": 500,
+    "patience": 150
+  },
+  "runs": [
+    {
+      "seed": 0,
+      "teacher_acc": 90.5090909090909,
+      "student_acc": 83.2
+    },
+    {
+      "seed": 1,
+      "teacher_acc": 89.99999999999999,
+      "student_acc": 84.83636363636363
+    },
+    {
+      "seed": 2,
+      "teacher_acc": 90.10909090909091,
+      "student_acc": 84.54545454545455
+    },
+    {
+      "seed": 3,
+      "teacher_acc": 90.03636363636363,
+      "student_acc": 84.43636363636364
+    },
+    {
+      "seed": 4,
+      "teacher_acc": 89.89090909090909,
+      "student_acc": 82.83636363636363
+    },
+    {
+      "seed": 5,
+      "teacher_acc": 89.41818181818181,
+      "student_acc": 83.01818181818182
+    },
+    {
+      "seed": 6,
+      "teacher_acc": 89.92727272727272,
+      "student_acc": 84.18181818181819
+    },
+    {
+      "seed": 7,
+      "teacher_acc": 89.85454545454546,
+      "student_acc": 83.49090909090908
+    },
+    {
+      "seed": 8,
+      "teacher_acc": 89.45454545454545,
+      "student_acc": 83.56363636363636
+    },
+    {
+      "seed": 9,
+      "teacher_acc": 90.14545454545454,
+      "student_acc": 84.54545454545455
+    }
+  ],
+  "summary": {
+    "teacher_mean": 89.93454545454546,
+    "teacher_std": 0.30415307151020304,
+    "student_mean": 83.86545454545453,
+    "student_std": 0.6888102090795641
+  }
+}

@@ -54,8 +54,9 @@ python run_all_distill.py
 ### Key Findings
 - **Cora**: MLP improved from 59% to 73% (+14%), closing 60% of the gap with Teacher
 - **Citeseer**: MLP improved from 59% to 69% (+10%), closing 77% of the gap
-- **PubMed**: MLP nearly matches Teacher (77.87% vs 79.12%)
-- **Amazon-Photo**: MLP achieves 92.90%, only 1% below Teacher
+- **PubMed**: MLP nearly matches Teacher (77.70% vs 79.12%)
+- **Amazon-Photo**: MLP achieves 92.92%, only 1% below Teacher
+- **Speedup**: MLP is 4-10x faster than GCN at inference time
 
 ## Method
 

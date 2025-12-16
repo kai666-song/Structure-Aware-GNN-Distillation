@@ -1,0 +1,73 @@
+{
+  "dataset": "amazon-photo",
+  "config": {
+    "alpha": 1.0,
+    "beta": 1.0,
+    "gamma": 1.0,
+    "temperature": 4.0,
+    "lr": 0.01,
+    "weight_decay": 0,
+    "hidden": 256,
+    "dropout": 0.5,
+    "epochs": 500,
+    "patience": 150
+  },
+  "runs": [
+    {
+      "seed": 0,
+      "teacher_acc": 94.70588235294117,
+      "student_acc": 93.72549019607843
+    },
+    {
+      "seed": 1,
+      "teacher_acc": 93.85620915032679,
+      "student_acc": 92.2875816993464
+    },
+    {
+      "seed": 2,
+      "teacher_acc": 92.6797385620915,
+      "student_acc": 91.89542483660131
+    },
+    {
+      "seed": 3,
+      "teacher_acc": 94.24836601307189,
+      "student_acc": 93.52941176470587
+    },
+    {
+      "seed": 4,
+      "teacher_acc": 94.18300653594771,
+      "student_acc": 94.24836601307189
+    },
+    {
+      "seed": 5,
+      "teacher_acc": 94.50980392156862,
+      "student_acc": 93.4640522875817
+    },
+    {
+      "seed": 6,
+      "teacher_acc": 93.7908496732026,
+      "student_acc": 92.22222222222221
+    },
+    {
+      "seed": 7,
+      "teacher_acc": 93.92156862745097,
+      "student_acc": 92.15686274509804
+    },
+    {
+      "seed": 8,
+      "teacher_acc": 93.7908496732026,
+      "student_acc": 92.41830065359477
+    },
+    {
+      "seed": 9,
+      "teacher_acc": 93.7908496732026,
+      "student_acc": 93.20261437908496
+    }
+  ],
+  "summary": {
+    "teacher_mean": 93.94771241830065,
+    "teacher_std": 0.5222218132140702,
+    "student_mean": 92.91503267973856,
+    "student_std": 0.7701332455767521
+  }
+}

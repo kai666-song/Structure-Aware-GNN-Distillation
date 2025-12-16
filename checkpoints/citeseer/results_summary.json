@@ -1,0 +1,73 @@
+{
+  "dataset": "citeseer",
+  "config": {
+    "alpha": 1.0,
+    "beta": 1.0,
+    "gamma": 1.0,
+    "temperature": 4.0,
+    "lr": 0.01,
+    "weight_decay": 0.0005,
+    "hidden": 64,
+    "dropout": 0.5,
+    "epochs": 300,
+    "patience": 100
+  },
+  "runs": [
+    {
+      "seed": 0,
+      "teacher_acc": 71.6,
+      "student_acc": 70.7
+    },
+    {
+      "seed": 1,
+      "teacher_acc": 71.8,
+      "student_acc": 68.30000000000001
+    },
+    {
+      "seed": 2,
+      "teacher_acc": 71.3,
+      "student_acc": 68.9
+    },
+    {
+      "seed": 3,
+      "teacher_acc": 72.1,
+      "student_acc": 69.60000000000001
+    },
+    {
+      "seed": 4,
+      "teacher_acc": 71.39999999999999,
+      "student_acc": 65.7
+    },
+    {
+      "seed": 5,
+      "teacher_acc": 71.7,
+      "student_acc": 68.9
+    },
+    {
+      "seed": 6,
+      "teacher_acc": 72.2,
+      "student_acc": 70.30000000000001
+    },
+    {
+      "seed": 7,
+      "teacher_acc": 71.7,
+      "student_acc": 67.80000000000001
+    },
+    {
+      "seed": 8,
+      "teacher_acc": 70.5,
+      "student_acc": 63.4
+    },
+    {
+      "seed": 9,
+      "teacher_acc": 72.0,
+      "student_acc": 70.5
+    }
+  ],
+  "summary": {
+    "teacher_mean": 71.63,
+    "teacher_std": 0.4648655719667788,
+    "student_mean": 68.41,
+    "student_std": 2.188812463414809
+  }
+}
