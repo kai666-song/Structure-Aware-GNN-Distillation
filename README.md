@@ -49,13 +49,13 @@ python run.py --data pubmed --dropout 0.7 --T 6.0 --lambda_kd 0.8
 
 | Dataset | GCN (Teacher) | MLP (Student) | Gap |
 |---------|---------------|---------------|-----|
-| Cora | 81.09 ± 0.28 | 60.09 ± 0.44 | 21.00 |
-| Citeseer | 71.30 ± 0.33 | 59.87 ± 0.41 | 11.43 |
-| PubMed | 79.39 ± 0.23 | 73.28 ± 0.28 | 6.11 |
-| Amazon-Computers | 63.35 ± 1.17 | 60.28 ± 2.08 | 3.07 |
-| Amazon-Photo | 79.09 ± 2.10 | 76.10 ± 1.05 | 2.99 |
+| Cora | 81.98 ± 0.54 | 59.06 ± 0.78 | 22.92 |
+| Citeseer | 71.39 ± 0.51 | 59.33 ± 1.00 | 12.06 |
+| PubMed | 79.05 ± 0.36 | 73.51 ± 0.28 | 5.54 |
+| Amazon-Computers | 89.93 ± 0.30 | 84.04 ± 0.47 | 5.89 |
+| Amazon-Photo | 93.90 ± 0.50 | 90.25 ± 0.90 | 3.65 |
 
-*Settings: epochs=200, hidden=64, lr=0.01, dropout=0.5, runs=10*
+*Dataset-specific hyperparameters with early stopping, runs=10*
 
 ## Project Structure
 
