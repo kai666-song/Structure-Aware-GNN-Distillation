@@ -9,6 +9,7 @@ Knowledge Distillation (KD) enables lightweight MLP models to learn from powerfu
 ### Key Features
 - **Teacher Model**: 2-layer Graph Convolutional Network (GCN)
 - **Student Model**: 2-layer Multi-Layer Perceptron (MLP)
+- **Innovation**: Structure-aware distillation with Relational Knowledge Distillation (RKD) loss
 - **Datasets**: Cora, Citeseer, PubMed, Amazon-Computers, Amazon-Photo
 
 ## Installation
@@ -24,58 +25,68 @@ pip install torch numpy scipy networkx torch_geometric
 
 ## Usage
 
-### Run Baseline Benchmark (Step 1)
+### Run Baseline Benchmark
+```bash
+python benchmark.py --all --num_runs 10
+```
+
+### Run Structure-Aware Distillation
 ```bash
 # Single dataset
-python benchmark.py --data cora --epochs 200 --num_runs 10
+python distill.py --data cora --alpha 1.0 --beta 1.0 --gamma 1.0 --num_runs 10
 
 # All datasets
-python benchmark.py --all --epochs 200 --num_runs 10
+python run_all_distill.py
 ```
 
-### Run Knowledge Distillation Training
-```bash
-# Cora with KD
-python run.py --data cora --dropout 0.7 --T 4.0 --lambda_kd 0.7
+## Results
 
-# Citeseer with KD
-python run.py --data citeseer --dropout 0.5 --T 3.0 --lambda_kd 0.7
+### Baseline vs Distillation Comparison
 
-# PubMed with KD
-python run.py --data pubmed --dropout 0.7 --T 6.0 --lambda_kd 0.8
+| Dataset | Teacher GCN | MLP Baseline | MLP Distilled | Improvement |
+|---------|-------------|--------------|---------------|-------------|
+| Cora | 82.04 | 59.06 | **72.77** | +13.71 |
+| Citeseer | 71.63 | 59.33 | **68.79** | +9.46 |
+| PubMed | 79.12 | 73.51 | **77.87** | +4.36 |
+| Amazon-Computers | 89.93 | 84.04 | 83.86 | -0.18 |
+| Amazon-Photo | 93.95 | 90.25 | **92.90** | +2.65 |
+
+### Key Findings
+- **Cora**: MLP improved from 59% to 73% (+14%), closing 60% of the gap with Teacher
+- **Citeseer**: MLP improved from 59% to 69% (+10%), closing 77% of the gap
+- **PubMed**: MLP nearly matches Teacher (77.87% vs 79.12%)
+- **Amazon-Photo**: MLP achieves 92.90%, only 1% below Teacher
+
+## Method
+
+The distillation loss combines three components:
+
+```
+L_total = α * L_task + β * L_kd + γ * L_struct
 ```
 
-## Baseline Results (Step 1)
-
-| Dataset | GCN (Teacher) | MLP (Student) | Gap |
-|---------|---------------|---------------|-----|
-| Cora | 81.98 ± 0.54 | 59.06 ± 0.78 | 22.92 |
-| Citeseer | 71.39 ± 0.51 | 59.33 ± 1.00 | 12.06 |
-| PubMed | 79.05 ± 0.36 | 73.51 ± 0.28 | 5.54 |
-| Amazon-Computers | 89.93 ± 0.30 | 84.04 ± 0.47 | 5.89 |
-| Amazon-Photo | 93.90 ± 0.50 | 90.25 ± 0.90 | 3.65 |
-
-*Dataset-specific hyperparameters with early stopping, runs=10*
+- **L_task**: CrossEntropy with ground truth labels
+- **L_kd**: KL divergence with teacher soft labels (temperature=4.0)
+- **L_struct**: Relational Knowledge Distillation loss (cosine similarity alignment)
 
 ## Project Structure
 
 ```
 ├── benchmark.py          # Baseline benchmark script
-├── train.py              # Training logic with KD
-├── run.py                # Main entry point
+├── distill.py            # Structure-aware distillation training
+├── run_all_distill.py    # Run distillation on all datasets
 ├── models.py             # GCN and MLP model definitions
 ├── layers.py             # Graph convolution layer
-├── params.py             # Hyperparameter settings
 ├── kd_losses/            # Knowledge distillation loss functions
-│   ├── __init__.py
-│   └── st.py             # Soft Target loss
+│   ├── st.py             # Soft Target loss
+│   └── rkd.py            # Relational Knowledge Distillation loss
 ├── utils/                # Utility functions
-│   ├── __init__.py
-│   ├── data_utils.py     # Data loading (Planetoid + Amazon/Coauthor)
+│   ├── data_utils.py     # Data loading
 │   └── utils.py          # Helper functions
 ├── data/                 # Dataset files
 └── results/              # Experiment results
-    └── step1_baseline_results.md
+    ├── step1_baseline_results.md
+    └── step2_distillation_results.md
 ```
 
 ## Requirements
@@ -83,14 +94,13 @@ python run.py --data pubmed --dropout 0.7 --T 6.0 --lambda_kd 0.8
 - Python >= 3.7
 - PyTorch >= 1.4.0
 - torch_geometric
-- numpy
-- scipy
-- networkx
+- numpy, scipy, networkx
 
 ## References
 
 - [Hinton et al. 2015] Distilling the Knowledge in a Neural Network
 - [Kipf & Welling 2017] Semi-Supervised Classification with Graph Convolutional Networks
+- [Park et al. 2019] Relational Knowledge Distillation
 
 ## License
 
