@@ -2,13 +2,24 @@
 
 ## Experiment Configuration
 - **Student Model**: MLPBatchNorm (MLP with BatchNorm)
-- **Loss Function**: L = α·L_task + β·L_kd + γ·L_struct
-- **Parameters**: α=1.0, β=1.0, γ=1.0, T=4.0
+- **Loss Function**: L = α·L_task + β·L_kd + γ·L_rkd + λ·L_topo
+- **Parameters**: α=1.0, β=1.0, γ=1.0, λ=1.0, T=4.0
 - **Runs**: 10 seeds per dataset
 
-## Main Results
+## SOTA Results: GAT Teacher + Topology Consistency Loss
 
-| Dataset | Teacher GCN | Student MLP | Δ |
+| Dataset | GAT Teacher | Student MLP | Δ |
+|---------|-------------|-------------|---|
+| Cora | 82.74±0.74 | **82.99±1.22** | +0.25% ✨ |
+| Citeseer | 71.39±0.89 | 71.08±1.06 | -0.31% |
+| PubMed | 78.00±0.40 | **79.51±0.84** | +1.51% ✨ |
+| Amazon-Photo | 94.27±0.46 | **94.48±0.76** | +0.21% ✨ |
+
+**Student surpasses Teacher on 3/4 datasets!**
+
+## GCN Teacher Results
+
+| Dataset | GCN Teacher | Student MLP | Δ |
 |---------|-------------|-------------|---|
 | Cora | 82.04±0.48 | **82.45±0.79** | +0.41% |
 | Citeseer | 71.63±0.46 | 71.80±0.60 | +0.17% |

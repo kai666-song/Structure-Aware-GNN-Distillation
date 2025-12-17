@@ -91,3 +91,118 @@ class MLPBatchNorm(nn.Module):
         # Output layer
         x = self.fc_out(x)
         return x
+
+
+# ============================================================================
+# GAT: Graph Attention Network (Stronger Teacher)
+# ============================================================================
+
+try:
+    from torch_geometric.nn import GATConv
+    HAS_PYG = True
+except ImportError:
+    HAS_PYG = False
+    print("Warning: torch_geometric not found. GAT model unavailable.")
+
+
+class GAT(nn.Module):
+    """Graph Attention Network (Stronger Teacher Model)
+    
+    Uses multi-head attention in first layer, single head in output layer.
+    Typically achieves 1-2% higher accuracy than GCN.
+    
+    Args:
+        nfeat: Input feature dimension
+        nhid: Hidden dimension (per head)
+        nclass: Number of classes
+        dropout: Dropout rate
+        heads: Number of attention heads in first layer
+        
+    Note: GAT uses edge_index format, not adjacency matrix.
+    Use convert_adj_to_edge_index() to convert if needed.
+    """
+    def __init__(self, nfeat, nhid, nclass, dropout, heads=8):
+        super(GAT, self).__init__()
+        
+        if not HAS_PYG:
+            raise ImportError("torch_geometric required for GAT. Install with: pip install torch_geometric")
+        
+        self.dropout = dropout
+        
+        # First GAT layer: multi-head attention
+        # Output: nhid * heads features
+        self.gat1 = GATConv(nfeat, nhid, heads=heads, dropout=dropout)
+        
+        # Second GAT layer: single head for classification
+        # Input: nhid * heads, Output: nclass
+        self.gat2 = GATConv(nhid * heads, nclass, heads=1, concat=False, dropout=dropout)
+        
+    def forward(self, x, edge_index):
+        """
+        Args:
+            x: Node features [N, nfeat]
+            edge_index: Edge index [2, E] in PyG format
+        """
+        if x.is_sparse:
+            x = x.to_dense()
+        x = x.float()
+        
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x = self.gat1(x, edge_index)
+        x = F.elu(x)
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x = self.gat2(x, edge_index)
+        
+        return x
+
+
+class GATv2(nn.Module):
+    """GATv2: Improved Graph Attention Network
+    
+    Uses GATv2Conv which fixes the static attention problem in original GAT.
+    Generally more expressive and achieves better results.
+    """
+    def __init__(self, nfeat, nhid, nclass, dropout, heads=8):
+        super(GATv2, self).__init__()
+        
+        if not HAS_PYG:
+            raise ImportError("torch_geometric required for GATv2")
+        
+        from torch_geometric.nn import GATv2Conv
+        
+        self.dropout = dropout
+        self.gat1 = GATv2Conv(nfeat, nhid, heads=heads, dropout=dropout)
+        self.gat2 = GATv2Conv(nhid * heads, nclass, heads=1, concat=False, dropout=dropout)
+        
+    def forward(self, x, edge_index):
+        if x.is_sparse:
+            x = x.to_dense()
+        x = x.float()
+        
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x = self.gat1(x, edge_index)
+        x = F.elu(x)
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x = self.gat2(x, edge_index)
+        
+        return x
+
+
+def convert_adj_to_edge_index(adj):
+    """Convert adjacency matrix to edge_index format for PyG models.
+    
+    Args:
+        adj: Sparse or dense adjacency matrix [N, N]
+        
+    Returns:
+        edge_index: [2, E] tensor of edge indices
+    """
+    import torch
+    
+    if adj.is_sparse:
+        adj = adj.coalesce()
+        edge_index = adj.indices()
+    else:
+        edge_index = adj.nonzero().t().contiguous()
+    
+    return edge_index
