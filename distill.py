@@ -18,32 +18,32 @@ import torch.optim as optim
 import torch.nn.functional as F
 import argparse
 
-from models import GCN, MLP
+from models import GCN, MLPBatchNorm
 from utils import accuracy, load_data_new, preprocess_features, preprocess_adj
 from kd_losses import SoftTarget, AdaptiveRKDLoss
 
 
 # Dataset-specific hyperparameters
-# Student uses longer patience since KD training is more complex
+# Student uses smaller weight_decay (1e-5) for better convergence
 DATASET_CONFIGS = {
     'cora': {
-        'lr': 0.01, 'weight_decay': 5e-4, 'hidden': 64,
+        'lr': 0.01, 'wd_teacher': 5e-4, 'wd_student': 1e-5, 'hidden': 64,
         'dropout': 0.5, 'epochs': 300, 'patience': 100,
     },
     'citeseer': {
-        'lr': 0.01, 'weight_decay': 5e-4, 'hidden': 64,
+        'lr': 0.01, 'wd_teacher': 5e-4, 'wd_student': 1e-5, 'hidden': 64,
         'dropout': 0.5, 'epochs': 300, 'patience': 100,
     },
     'pubmed': {
-        'lr': 0.01, 'weight_decay': 5e-4, 'hidden': 64,
+        'lr': 0.01, 'wd_teacher': 5e-4, 'wd_student': 1e-5, 'hidden': 64,
         'dropout': 0.5, 'epochs': 300, 'patience': 100,
     },
     'amazon-computers': {
-        'lr': 0.01, 'weight_decay': 0, 'hidden': 256,
+        'lr': 0.01, 'wd_teacher': 0, 'wd_student': 0, 'hidden': 256,
         'dropout': 0.5, 'epochs': 500, 'patience': 150,
     },
     'amazon-photo': {
-        'lr': 0.01, 'weight_decay': 0, 'hidden': 256,
+        'lr': 0.01, 'wd_teacher': 0, 'wd_student': 0, 'hidden': 256,
         'dropout': 0.5, 'epochs': 500, 'patience': 150,
     },
 }
@@ -106,17 +106,17 @@ class DistillationTrainer:
             nclass=self.nclass, dropout=config['dropout']
         ).to(self.device)
         
-        # Student: MLP
-        self.student = MLP(
+        # Student: MLPBatchNorm (better convergence for distillation)
+        self.student = MLPBatchNorm(
             nfeat=self.nfeat, nhid=config['hidden'],
             nclass=self.nclass, dropout=config['dropout']
         ).to(self.device)
         
-        # Student optimizer
+        # Student optimizer (uses smaller weight_decay)
         self.optimizer = optim.Adam(
             self.student.parameters(),
             lr=config['lr'],
-            weight_decay=config['weight_decay']
+            weight_decay=config['wd_student']
         )
         
     def init_losses(self):
@@ -138,7 +138,7 @@ class DistillationTrainer:
         optimizer = optim.Adam(
             self.teacher.parameters(),
             lr=config['lr'],
-            weight_decay=config['weight_decay']
+            weight_decay=config['wd_teacher']
         )
         
         best_val_acc = 0

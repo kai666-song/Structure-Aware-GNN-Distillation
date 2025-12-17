@@ -6,7 +6,8 @@
     "gamma": 1.0,
     "temperature": 4.0,
     "lr": 0.01,
-    "weight_decay": 0.0005,
+    "wd_teacher": 0.0005,
+    "wd_student": 1e-05,
     "hidden": 64,
     "dropout": 0.5,
     "epochs": 300,
@@ -16,58 +17,58 @@
     {
       "seed": 0,
       "teacher_acc": 81.9,
-      "student_acc": 71.39999999999999
+      "student_acc": 82.4
     },
     {
       "seed": 1,
       "teacher_acc": 82.5,
-      "student_acc": 73.7
+      "student_acc": 83.5
     },
     {
       "seed": 2,
       "teacher_acc": 82.30000000000001,
-      "student_acc": 76.9
+      "student_acc": 83.39999999999999
     },
     {
       "seed": 3,
       "teacher_acc": 82.4,
-      "student_acc": 70.89999999999999
+      "student_acc": 81.80000000000001
     },
     {
       "seed": 4,
       "teacher_acc": 82.4,
-      "student_acc": 75.6
+      "student_acc": 83.39999999999999
     },
     {
       "seed": 5,
       "teacher_acc": 82.4,
-      "student_acc": 63.4
+      "student_acc": 80.9
     },
     {
       "seed": 6,
       "teacher_acc": 81.60000000000001,
-      "student_acc": 76.5
+      "student_acc": 82.5
     },
     {
       "seed": 7,
       "teacher_acc": 81.80000000000001,
-      "student_acc": 78.0
+      "student_acc": 82.4
     },
     {
       "seed": 8,
       "teacher_acc": 82.2,
-      "student_acc": 71.7
+      "student_acc": 82.5
     },
     {
       "seed": 9,
       "teacher_acc": 80.9,
-      "student_acc": 68.4
+      "student_acc": 81.7
     }
   ],
   "summary": {
     "teacher_mean": 82.04,
     "teacher_std": 0.4758150901348119,
-    "student_mean": 72.65,
-    "student_std": 4.248117230020848
+    "student_mean": 82.45000000000002,
+    "student_std": 0.7940403012442083
   }
 }

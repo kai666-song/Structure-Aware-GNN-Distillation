@@ -127,6 +127,8 @@ class AdaptiveRKDLoss(nn.Module):
     
     Automatically handles memory constraints by sampling nodes when
     the full relation matrix would be too large.
+    
+    Scalable to million-node graphs via random batch sampling.
     """
     
     def __init__(self, max_samples=2048, eps=1e-8):
@@ -134,6 +136,7 @@ class AdaptiveRKDLoss(nn.Module):
         Args:
             max_samples: Maximum number of samples for relation computation.
                         If N > max_samples, random sampling is applied.
+                        Memory: O(max_samples^2), e.g., 2048^2 = 4M floats = 16MB
             eps: Small constant for numerical stability.
         """
         super(AdaptiveRKDLoss, self).__init__()
@@ -148,7 +151,7 @@ class AdaptiveRKDLoss(nn.Module):
         Args:
             student_features: Student output features [N, D]
             teacher_features: Teacher output features [N, D]
-            mask: Optional boolean mask to select specific nodes (e.g., train_mask)
+            mask: Optional boolean mask or index tensor to select specific nodes
         
         Returns:
             RKD loss value
@@ -156,7 +159,10 @@ class AdaptiveRKDLoss(nn.Module):
         # Apply mask if provided
         if mask is not None:
             if isinstance(mask, torch.Tensor):
-                indices = mask.nonzero(as_tuple=True)[0]
+                if mask.dtype == torch.bool:
+                    indices = mask.nonzero(as_tuple=True)[0]
+                else:
+                    indices = mask  # Already indices
             else:
                 indices = torch.tensor(mask, device=student_features.device)
             student_features = student_features[indices]
@@ -164,9 +170,68 @@ class AdaptiveRKDLoss(nn.Module):
         
         N = student_features.size(0)
         
-        # Subsample if too many nodes
+        # Subsample if too many nodes (scalability for large graphs)
         if N > self.max_samples:
             sample_indices = torch.randperm(N, device=student_features.device)[:self.max_samples]
             return self.rkd(student_features, teacher_features, sample_indices)
         else:
             return self.rkd(student_features, teacher_features)
+
+
+class BatchRKDLoss(nn.Module):
+    """
+    Batch-based RKD Loss for million-scale graphs.
+    
+    Instead of computing full N×N relation matrix, samples multiple
+    mini-batches and averages the RKD loss. This enables:
+    - Constant memory usage regardless of graph size
+    - Stochastic gradient estimation
+    - Scalability to graphs with millions of nodes
+    """
+    
+    def __init__(self, batch_size=1024, num_batches=4, eps=1e-8):
+        """
+        Args:
+            batch_size: Number of nodes per batch for relation computation
+            num_batches: Number of random batches to sample per forward pass
+            eps: Numerical stability constant
+        """
+        super(BatchRKDLoss, self).__init__()
+        self.batch_size = batch_size
+        self.num_batches = num_batches
+        self.eps = eps
+        self.rkd = RKDLoss(eps=eps)
+    
+    def forward(self, student_features, teacher_features, mask=None):
+        """
+        Compute batch-averaged RKD loss.
+        
+        Memory complexity: O(batch_size^2) per batch
+        For batch_size=1024: 1024^2 * 4 bytes = 4MB per batch
+        """
+        # Apply mask if provided
+        if mask is not None:
+            if isinstance(mask, torch.Tensor):
+                if mask.dtype == torch.bool:
+                    indices = mask.nonzero(as_tuple=True)[0]
+                else:
+                    indices = mask
+            else:
+                indices = torch.tensor(mask, device=student_features.device)
+            student_features = student_features[indices]
+            teacher_features = teacher_features[indices]
+        
+        N = student_features.size(0)
+        
+        # If small enough, compute directly
+        if N <= self.batch_size:
+            return self.rkd(student_features, teacher_features)
+        
+        # Sample multiple batches and average
+        total_loss = 0.0
+        for _ in range(self.num_batches):
+            batch_indices = torch.randperm(N, device=student_features.device)[:self.batch_size]
+            batch_loss = self.rkd(student_features, teacher_features, batch_indices)
+            total_loss += batch_loss
+        
+        return total_loss / self.num_batches

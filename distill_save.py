@@ -15,17 +15,17 @@ import torch.nn as nn
 import torch.optim as optim
 import argparse
 
-from models import GCN, MLP
+from models import GCN, MLPBatchNorm
 from utils import accuracy, load_data_new, preprocess_features, preprocess_adj
 from kd_losses import SoftTarget, AdaptiveRKDLoss
 
 
 DATASET_CONFIGS = {
-    'cora': {'lr': 0.01, 'weight_decay': 5e-4, 'hidden': 64, 'dropout': 0.5, 'epochs': 300, 'patience': 100},
-    'citeseer': {'lr': 0.01, 'weight_decay': 5e-4, 'hidden': 64, 'dropout': 0.5, 'epochs': 300, 'patience': 100},
-    'pubmed': {'lr': 0.01, 'weight_decay': 5e-4, 'hidden': 64, 'dropout': 0.5, 'epochs': 300, 'patience': 100},
-    'amazon-computers': {'lr': 0.01, 'weight_decay': 0, 'hidden': 256, 'dropout': 0.5, 'epochs': 500, 'patience': 150},
-    'amazon-photo': {'lr': 0.01, 'weight_decay': 0, 'hidden': 256, 'dropout': 0.5, 'epochs': 500, 'patience': 150},
+    'cora': {'lr': 0.01, 'wd_teacher': 5e-4, 'wd_student': 1e-5, 'hidden': 64, 'dropout': 0.5, 'epochs': 300, 'patience': 100},
+    'citeseer': {'lr': 0.01, 'wd_teacher': 5e-4, 'wd_student': 1e-5, 'hidden': 64, 'dropout': 0.5, 'epochs': 300, 'patience': 100},
+    'pubmed': {'lr': 0.01, 'wd_teacher': 5e-4, 'wd_student': 1e-5, 'hidden': 64, 'dropout': 0.5, 'epochs': 300, 'patience': 100},
+    'amazon-computers': {'lr': 0.01, 'wd_teacher': 0, 'wd_student': 0, 'hidden': 256, 'dropout': 0.5, 'epochs': 500, 'patience': 150},
+    'amazon-photo': {'lr': 0.01, 'wd_teacher': 0, 'wd_student': 0, 'hidden': 256, 'dropout': 0.5, 'epochs': 500, 'patience': 150},
 }
 
 
@@ -78,8 +78,8 @@ class DistillationTrainerWithSave:
     def init_models(self):
         config = self.config
         self.teacher = GCN(self.nfeat, config['hidden'], self.nclass, config['dropout']).to(self.device)
-        self.student = MLP(self.nfeat, config['hidden'], self.nclass, config['dropout']).to(self.device)
-        self.optimizer = optim.Adam(self.student.parameters(), lr=config['lr'], weight_decay=config['weight_decay'])
+        self.student = MLPBatchNorm(self.nfeat, config['hidden'], self.nclass, config['dropout']).to(self.device)
+        self.optimizer = optim.Adam(self.student.parameters(), lr=config['lr'], weight_decay=config['wd_student'])
         
     def init_losses(self):
         self.criterion_task = nn.CrossEntropyLoss()
@@ -89,7 +89,7 @@ class DistillationTrainerWithSave:
     def train_teacher(self):
         print(f'\n--- Training Teacher GCN (seed={self.seed}) ---')
         config = self.config
-        optimizer = optim.Adam(self.teacher.parameters(), lr=config['lr'], weight_decay=config['weight_decay'])
+        optimizer = optim.Adam(self.teacher.parameters(), lr=config['lr'], weight_decay=config['wd_teacher'])
         
         best_val_acc = 0
         best_state = None

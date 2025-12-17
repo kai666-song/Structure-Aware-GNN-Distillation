@@ -1,0 +1,92 @@
+[
+  {
+    "config": "Basic MLP, wd=5e-4, gamma=1.0",
+    "use_batchnorm": false,
+    "weight_decay": 0.0005,
+    "gamma": 1.0,
+    "teacher_mean": 82.3,
+    "teacher_std": 0.20976176963402923,
+    "student_mean": 73.86,
+    "student_std": 1.4934523762075596
+  },
+  {
+    "config": "Basic MLP, wd=1e-5, gamma=1.0",
+    "use_batchnorm": false,
+    "weight_decay": 1e-05,
+    "gamma": 1.0,
+    "teacher_mean": 82.3,
+    "teacher_std": 0.20976176963402923,
+    "student_mean": 79.14000000000001,
+    "student_std": 1.2370933675353686
+  },
+  {
+    "config": "Basic MLP, wd=0, gamma=1.0",
+    "use_batchnorm": false,
+    "weight_decay": 0,
+    "gamma": 1.0,
+    "teacher_mean": 82.3,
+    "teacher_std": 0.20976176963402923,
+    "student_mean": 79.92,
+    "student_std": 1.6228370220080648
+  },
+  {
+    "config": "MLPBatchNorm, wd=5e-4, gamma=1.0",
+    "use_batchnorm": true,
+    "weight_decay": 0.0005,
+    "gamma": 1.0,
+    "teacher_mean": 82.3,
+    "teacher_std": 0.20976176963402923,
+    "student_mean": 80.9,
+    "student_std": 0.49396356140914177
+  },
+  {
+    "config": "MLPBatchNorm, wd=1e-5, gamma=1.0",
+    "use_batchnorm": true,
+    "weight_decay": 1e-05,
+    "gamma": 1.0,
+    "teacher_mean": 82.3,
+    "teacher_std": 0.20976176963402923,
+    "student_mean": 82.52000000000001,
+    "student_std": 1.2302845199383747
+  },
+  {
+    "config": "MLPBatchNorm, wd=0, gamma=1.0",
+    "use_batchnorm": true,
+    "weight_decay": 0,
+    "gamma": 1.0,
+    "teacher_mean": 82.3,
+    "teacher_std": 0.20976176963402923,
+    "student_mean": 82.66,
+    "student_std": 0.8260750571225289
+  },
+  {
+    "config": "MLPBatchNorm, wd=1e-5, gamma=0 (Ablation)",
+    "use_batchnorm": true,
+    "weight_decay": 1e-05,
+    "gamma": 0.0,
+    "teacher_mean": 82.3,
+    "teacher_std": 0.20976176963402923,
+    "student_mean": 82.12,
+    "student_std": 0.5635601121442135
+  },
+  {
+    "config": "MLPBatchNorm, wd=1e-5, gamma=0.5",
+    "use_batchnorm": true,
+    "weight_decay": 1e-05,
+    "gamma": 0.5,
+    "teacher_mean": 82.3,
+    "teacher_std": 0.20976176963402923,
+    "student_mean": 82.67999999999999,
+    "student_std": 0.6615134163416451
+  },
+  {
+    "config": "MLPBatchNorm, wd=1e-5, gamma=2.0",
+    "use_batchnorm": true,
+    "weight_decay": 1e-05,
+    "gamma": 2.0,
+    "teacher_mean": 82.3,
+    "teacher_std": 0.20976176963402923,
+    "student_mean": 82.9,
+    "student_std": 1.0862780491200168
+  }
+]
