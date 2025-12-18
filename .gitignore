@@ -30,3 +30,14 @@ data/ogb/
 # Logs
 *.log
 
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# Environment
+.env
+venv/
+env/
+
+# OS files
+Thumbs.db
+
