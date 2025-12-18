@@ -10,8 +10,9 @@ Knowledge Distillation (KD) enables lightweight MLP models to learn from powerfu
 - **Teacher Models**: GCN and GAT (Graph Attention Network)
 - **Student Model**: MLPBatchNorm (MLP with BatchNorm for better convergence)
 - **Innovation**: Topology Consistency Distillation (TCD) - structure-aware loss that aligns with graph topology
-- **Highlight**: Student MLP surpasses Teacher on 3/4 datasets with GAT!
-- **Datasets**: Cora, Citeseer, PubMed, Amazon-Computers, Amazon-Photo
+- **Highlight**: Student MLP surpasses Teacher on 3/4 homophilic datasets with GAT!
+- **Killer Feature**: On Actor (heterophilic), Student beats Teacher by **6.33%** (p < 0.001) ✨
+- **Datasets**: Cora, Citeseer, PubMed, Amazon-Photo (homophilic) + Chameleon, Squirrel, Actor (heterophilic)
 
 ## Installation
 
@@ -38,6 +39,21 @@ python distill.py --data cora --alpha 1.0 --beta 1.0 --gamma 1.0 --num_runs 10
 
 # With GAT teacher + Topology Loss (SOTA)
 python distill_gat.py --data cora --teacher gat --lambda_topo 1.0 --num_runs 10
+```
+
+### Run Improved Experiments (NEW)
+```bash
+# Heterophilic graphs (Chameleon, Squirrel, Actor) - potential killer feature!
+python experiments_improved.py --experiment heterophilic --num_runs 10
+
+# Citeseer optimization with degree-aware topology loss
+python experiments_improved.py --experiment citeseer_optimize --num_runs 10
+
+# Statistical significance testing (paired t-test)
+python experiments_improved.py --experiment significance_test
+
+# Run all improved experiments
+python experiments_improved.py --experiment all --num_runs 10
 ```
 
 ## Results
@@ -71,10 +87,28 @@ python distill_gat.py --data cora --teacher gat --lambda_topo 1.0 --num_runs 10
 | Amazon-Computers | 41.25±5.68 | 81.47±3.88 | **83.15±3.11** | +1.68% |
 | Amazon-Photo | 89.92±0.69 | 92.85±1.22 | **93.52±0.85** | +0.67% |
 
+### Heterophilic Graph Results (NEW - Killer Feature!)
+
+| Dataset | Type | GAT Teacher | Student MLP | Gap | Significance |
+|---------|------|-------------|-------------|-----|--------------|
+| Chameleon | Heterophilic | **58.22±1.91** | 53.21±2.40 | -5.01% | |
+| Squirrel | Heterophilic | 33.15±1.27 | 32.88±1.49 | -0.28% | |
+| **Actor** | **Heterophilic** | 27.16±1.12 | **33.49±1.65** | **+6.33%** | ***** ✨ |
+
+### Statistical Significance (Paired t-test)
+
+| Dataset | Gap | p-value | Significant? |
+|---------|-----|---------|--------------|
+| PubMed | +1.51% | 0.0003 | *** (p < 0.01) ✅ |
+| **Actor** | **+6.33%** | **< 0.001** | ***** (p < 0.001)** ✅ |
+| Cora | +0.25% | 0.377 | n.s. |
+| Amazon-Photo | +0.22% | 0.451 | n.s. |
+
 ### Key Findings
-- **Student > Teacher**: MLP surpasses Teacher on 3/4 datasets with GAT + Topology Loss!
-- **Best Result**: 94.48% on Amazon-Photo (Student > GAT Teacher)
-- **Topology Loss**: Explicitly aligns student features with graph structure
+- **Killer Feature**: On Actor (heterophilic, low-degree), Student MLP beats Teacher GAT by **6.33%** with p < 0.001!
+- **Student > Teacher**: MLP surpasses Teacher on 3/4 homophilic datasets with GAT + Topology Loss
+- **Statistical Significance**: 2 datasets show significant improvements (PubMed, Actor)
+- **Insight**: On heterophilic graphs with low average degree, MLP's independence from noisy neighbors is advantageous
 - **Massive Improvement**: MLP baseline ~45% → Distilled MLP ~83% on Cora (+38%)
 - **Speedup**: MLP is 4-10x faster than GNN at inference time
 

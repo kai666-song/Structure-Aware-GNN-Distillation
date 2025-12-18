@@ -1,0 +1,56 @@
+[
+  {
+    "dataset": "Cora",
+    "type": "Homophilic",
+    "teacher": "82.74\u00b10.74",
+    "student": "82.99\u00b11.22",
+    "gap": 0.25,
+    "p_value": 0.37668939409205826,
+    "sig": ""
+  },
+  {
+    "dataset": "Citeseer",
+    "type": "Homophilic",
+    "teacher": "71.39\u00b10.89",
+    "student": "71.08\u00b11.06",
+    "gap": -0.3100000000000023,
+    "p_value": 0.4314203052971285,
+    "sig": ""
+  },
+  {
+    "dataset": "PubMed",
+    "type": "Homophilic",
+    "teacher": "78.00\u00b10.40",
+    "student": "79.51\u00b10.84",
+    "gap": 1.509999999999991,
+    "p_value": 0.0002608450827748128,
+    "sig": "***"
+  },
+  {
+    "dataset": "Amazon-Photo",
+    "type": "Homophilic",
+    "teacher": "94.27\u00b10.46",
+    "student": "94.48\u00b10.76",
+    "gap": 0.2156862745097925,
+    "p_value": 0.45090933000321487,
+    "sig": ""
+  },
+  {
+    "dataset": "Squirrel",
+    "type": "Heterophilic",
+    "teacher": "33.15\u00b11.27",
+    "student": "32.88\u00b11.49",
+    "gap": -0.2788461538461604,
+    "p_value": 0.5521945973153793,
+    "sig": ""
+  },
+  {
+    "dataset": "Actor",
+    "type": "Heterophilic",
+    "teacher": "27.16\u00b11.12",
+    "student": "33.49\u00b11.65",
+    "gap": 6.328947368421048,
+    "p_value": 3.8735196063924915e-07,
+    "sig": "***"
+  }
+]

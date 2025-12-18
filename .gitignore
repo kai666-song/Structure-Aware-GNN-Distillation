@@ -23,6 +23,9 @@ __pycache__/
 # PyTorch Geometric downloaded data (can be re-downloaded)
 data/amazon/
 data/coauthor/
+data/actor/
+data/heterophilic/
+data/ogb/
 
 # Logs
 *.log
