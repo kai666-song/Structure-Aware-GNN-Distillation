@@ -1,191 +1,288 @@
 """
-Topology Consistency Distillation (TCD) Loss
+Advanced Topology-Aware Knowledge Distillation Losses
 
-Unlike vanilla RKD which ignores graph structure, TCD explicitly aligns
-student's feature similarity with the graph topology (adjacency matrix).
+This module implements SOTA topology-aware distillation methods:
+1. ContrastiveTopologyLoss: InfoNCE-based contrastive learning with graph structure
+2. SoftTopologyLoss: Align student similarity with teacher attention weights
+3. AttentionDistillationLoss: Direct attention weight transfer from GAT
 
 Key Innovation:
-- Only compute loss for node pairs that are connected (have edges)
-- Force MLP to learn: "if nodes i,j are neighbors, their features should be similar"
-- This transfers topological knowledge from GNN to MLP without requiring graph at inference
-
-Reference: Structure-Aware Knowledge Distillation for Graph Neural Networks
+- Move beyond naive "force neighbors to be similar"
+- Learn teacher's attention distribution (soft topology)
+- Use contrastive learning to distinguish neighbors from non-neighbors
 """
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 
 
-class TopologyConsistencyLoss(nn.Module):
+class ContrastiveTopologyLoss(nn.Module):
     """
-    Topology Consistency Distillation Loss
+    Simplified Contrastive Topology Loss - More Stable Version
     
-    Aligns student feature similarity with graph adjacency structure.
-    Only penalizes dissimilarity for connected node pairs.
+    Uses margin-based triplet loss instead of InfoNCE for better stability:
+    L = max(0, margin + sim(anchor, negative) - sim(anchor, positive))
+    
+    This is more stable than InfoNCE and works better with KD.
     
     Args:
-        pos_weight: Weight for positive (connected) pairs to handle class imbalance
         temperature: Temperature for similarity scaling
-        use_teacher_sim: If True, align with teacher similarity; if False, align with adjacency
+        margin: Margin for triplet loss
+        max_samples: Maximum edge samples per batch
     """
-    def __init__(self, pos_weight=1.0, temperature=1.0, use_teacher_sim=True):
+    def __init__(self, temperature=0.5, margin=0.3, max_samples=2048):
         super().__init__()
-        self.pos_weight = pos_weight
         self.temperature = temperature
-        self.use_teacher_sim = use_teacher_sim
-        
-    def forward(self, student_out, teacher_out, adj, mask=None):
-        """
-        Args:
-            student_out: Student logits [N, C]
-            teacher_out: Teacher logits [N, C]
-            adj: Adjacency matrix (sparse or dense) [N, N]
-            mask: Optional node mask for training nodes
-        """
-        # Get features (use softmax probabilities as features)
-        student_feat = F.softmax(student_out / self.temperature, dim=1)
-        teacher_feat = F.softmax(teacher_out / self.temperature, dim=1)
-        
-        # If mask provided, only use those nodes
-        if mask is not None:
-            student_feat = student_feat[mask]
-            teacher_feat = teacher_feat[mask]
-            # Extract subgraph adjacency
-            if adj.is_sparse:
-                adj = adj.to_dense()
-            adj = adj[mask][:, mask]
-        else:
-            if adj.is_sparse:
-                adj = adj.to_dense()
-        
-        # Compute cosine similarity matrices
-        student_sim = self._cosine_similarity_matrix(student_feat)
-        teacher_sim = self._cosine_similarity_matrix(teacher_feat)
-        
-        # Get edge mask (where adjacency > 0)
-        edge_mask = (adj > 0).float()
-        num_edges = edge_mask.sum()
-        
-        if num_edges == 0:
-            return torch.tensor(0.0, device=student_out.device)
-        
-        if self.use_teacher_sim:
-            # Align student similarity with teacher similarity (for connected pairs)
-            diff = (student_sim - teacher_sim) ** 2
-            loss = (diff * edge_mask * self.pos_weight).sum() / num_edges
-        else:
-            # Directly maximize similarity for connected pairs
-            # Loss = 1 - similarity for connected pairs
-            loss = ((1 - student_sim) * edge_mask * self.pos_weight).sum() / num_edges
-        
-        return loss
-    
-    def _cosine_similarity_matrix(self, feat):
-        """Compute pairwise cosine similarity matrix."""
-        feat_norm = F.normalize(feat, p=2, dim=1)
-        sim = torch.mm(feat_norm, feat_norm.t())
-        return sim
-
-
-class AdaptiveTopologyLoss(nn.Module):
-    """
-    Memory-efficient Topology Loss with sampling for large graphs.
-    
-    For graphs with >10k nodes, computing full N×N similarity is expensive.
-    This version samples edges and computes loss on sampled pairs.
-    """
-    def __init__(self, max_edges=4096, pos_weight=1.0, temperature=1.0):
-        super().__init__()
-        self.max_edges = max_edges
-        self.pos_weight = pos_weight
-        self.temperature = temperature
+        self.margin = margin
+        self.max_samples = max_samples
         
     def forward(self, student_out, teacher_out, edge_index, mask=None):
         """
-        Args:
-            student_out: Student logits [N, C]
-            teacher_out: Teacher logits [N, C]
-            edge_index: Edge index tensor [2, E] (PyG format)
-            mask: Optional training node mask
+        Compute contrastive loss encouraging neighbors to be more similar
+        than non-neighbors.
         """
-        # Get features
-        student_feat = F.softmax(student_out / self.temperature, dim=1)
-        teacher_feat = F.softmax(teacher_out / self.temperature, dim=1)
+        # Get normalized features from both student and teacher
+        student_feat = F.normalize(F.softmax(student_out / self.temperature, dim=1), p=2, dim=1)
+        teacher_feat = F.normalize(F.softmax(teacher_out / self.temperature, dim=1), p=2, dim=1)
         
-        # Filter edges to only include training nodes if mask provided
-        if mask is not None:
-            mask_set = set(mask.cpu().numpy().tolist()) if isinstance(mask, torch.Tensor) else set(mask)
-            edge_mask = torch.tensor([
-                (edge_index[0, i].item() in mask_set) and (edge_index[1, i].item() in mask_set)
-                for i in range(edge_index.size(1))
-            ], device=edge_index.device)
-            edge_index = edge_index[:, edge_mask]
-        
+        # Sample edges
         num_edges = edge_index.size(1)
-        if num_edges == 0:
+        if num_edges > self.max_samples:
+            perm = torch.randperm(num_edges, device=edge_index.device)[:self.max_samples]
+            src, dst = edge_index[0, perm], edge_index[1, perm]
+        else:
+            src, dst = edge_index[0], edge_index[1]
+        
+        num_sampled = len(src)
+        if num_sampled == 0:
             return torch.tensor(0.0, device=student_out.device)
         
-        # Sample edges if too many
-        if num_edges > self.max_edges:
-            perm = torch.randperm(num_edges, device=edge_index.device)[:self.max_edges]
-            edge_index = edge_index[:, perm]
-            num_edges = self.max_edges
+        # Positive pairs: connected nodes (edges)
+        # Student should match teacher's similarity for these pairs
+        student_pos_sim = (student_feat[src] * student_feat[dst]).sum(dim=1)
+        teacher_pos_sim = (teacher_feat[src] * teacher_feat[dst]).sum(dim=1)
         
-        # Get source and target node features
-        src, dst = edge_index[0], edge_index[1]
+        # Loss 1: Align student similarity with teacher similarity for edges
+        loss_align = F.mse_loss(student_pos_sim, teacher_pos_sim.detach())
         
-        student_src = F.normalize(student_feat[src], p=2, dim=1)
-        student_dst = F.normalize(student_feat[dst], p=2, dim=1)
-        teacher_src = F.normalize(teacher_feat[src], p=2, dim=1)
-        teacher_dst = F.normalize(teacher_feat[dst], p=2, dim=1)
+        # Loss 2: Margin loss - positive pairs should have higher similarity
+        # Sample random negative pairs
+        neg_dst = torch.randint(0, student_out.size(0), (num_sampled,), device=student_out.device)
+        student_neg_sim = (student_feat[src] * student_feat[neg_dst]).sum(dim=1)
         
-        # Compute pairwise similarity for edges
-        student_sim = (student_src * student_dst).sum(dim=1)
-        teacher_sim = (teacher_src * teacher_dst).sum(dim=1)
+        # Triplet margin loss: sim(pos) > sim(neg) + margin
+        loss_margin = F.relu(self.margin + student_neg_sim - student_pos_sim).mean()
         
-        # MSE loss between student and teacher similarity
-        loss = F.mse_loss(student_sim, teacher_sim)
-        
-        return loss * self.pos_weight
+        return loss_align + 0.5 * loss_margin
+    
+    def _build_adj_dict(self, edge_index, num_nodes):
+        """Build adjacency dictionary for fast lookup."""
+        adj_dict = {i: [] for i in range(num_nodes)}
+        src, dst = edge_index[0].cpu().numpy(), edge_index[1].cpu().numpy()
+        for s, d in zip(src, dst):
+            adj_dict[s].append(d)
+        return adj_dict
 
 
-class HybridTopologyLoss(nn.Module):
+class SoftTopologyLoss(nn.Module):
     """
-    Combines RKD-style relational loss with topology-aware masking.
+    Soft Topology Distillation Loss
     
-    L_hybrid = λ_rkd * L_rkd + λ_topo * L_topo
+    Instead of using binary adjacency matrix, use teacher's attention weights
+    as soft topology targets. Student should learn to produce similar
+    pairwise similarities as teacher's attention distribution.
     
-    This provides both:
-    1. Global relational knowledge (RKD on all pairs)
-    2. Local topological consistency (TCD on connected pairs)
+    L = MSE(StudentSim, TeacherAttn) for connected pairs
+    
+    Args:
+        temperature: Temperature for similarity computation
     """
-    def __init__(self, lambda_rkd=1.0, lambda_topo=1.0, max_samples=2048):
+    def __init__(self, temperature=1.0):
         super().__init__()
-        self.lambda_rkd = lambda_rkd
-        self.lambda_topo = lambda_topo
-        self.max_samples = max_samples
+        self.temperature = temperature
         
-    def forward(self, student_out, teacher_out, adj=None, edge_index=None, mask=None):
+    def forward(self, student_out, teacher_attn, edge_index, mask=None):
         """
         Args:
-            student_out, teacher_out: Model outputs
-            adj: Adjacency matrix (for dense computation)
-            edge_index: Edge index (for sparse computation)
+            student_out: Student logits [N, C]
+            teacher_attn: Teacher attention weights [E,] or [E, H] for multi-head
+            edge_index: Edge index [2, E]
             mask: Training node mask
         """
-        # RKD component (global relational)
-        loss_rkd = self._rkd_loss(student_out, teacher_out, mask)
+        # Normalize student features
+        student_feat = F.normalize(F.softmax(student_out / self.temperature, dim=1), p=2, dim=1)
         
-        # Topology component (local structural)
-        if edge_index is not None:
-            loss_topo = self._topo_loss_sparse(student_out, teacher_out, edge_index, mask)
-        elif adj is not None:
-            loss_topo = self._topo_loss_dense(student_out, teacher_out, adj, mask)
+        # Get edge endpoints
+        src, dst = edge_index[0], edge_index[1]
+        
+        # Filter to training edges if mask provided
+        if mask is not None:
+            mask_set = set(mask.cpu().numpy().tolist())
+            edge_mask = torch.tensor([
+                (src[i].item() in mask_set) or (dst[i].item() in mask_set)
+                for i in range(edge_index.size(1))
+            ], device=edge_index.device)
+            src, dst = src[edge_mask], dst[edge_mask]
+            if teacher_attn.dim() == 1:
+                teacher_attn = teacher_attn[edge_mask]
+            else:
+                teacher_attn = teacher_attn[edge_mask]
+        
+        if len(src) == 0:
+            return torch.tensor(0.0, device=student_out.device)
+        
+        # Sample if too many edges
+        num_edges = len(src)
+        if num_edges > 4096:
+            perm = torch.randperm(num_edges, device=src.device)[:4096]
+            src, dst = src[perm], dst[perm]
+            if teacher_attn.dim() == 1:
+                teacher_attn = teacher_attn[perm]
+            else:
+                teacher_attn = teacher_attn[perm]
+        
+        # Compute student pairwise similarity for edges
+        student_sim = (student_feat[src] * student_feat[dst]).sum(dim=1)  # [E]
+        student_sim = (student_sim + 1) / 2  # Scale to [0, 1]
+        
+        # Normalize teacher attention to [0, 1]
+        if teacher_attn.dim() > 1:
+            teacher_attn = teacher_attn.mean(dim=-1)  # Average over heads
+        teacher_attn = (teacher_attn - teacher_attn.min()) / (teacher_attn.max() - teacher_attn.min() + 1e-8)
+        
+        # MSE loss
+        loss = F.mse_loss(student_sim, teacher_attn)
+        
+        return loss
+
+
+class AttentionDistillationLoss(nn.Module):
+    """
+    Direct Attention Weight Distillation
+    
+    Transfer GAT's learned attention weights to MLP by making MLP's
+    feature similarity distribution match GAT's attention distribution.
+    
+    For each node i, we want:
+    softmax(MLP_sim(i, neighbors)) ≈ GAT_attention(i, neighbors)
+    
+    Uses KL divergence for distribution matching.
+    """
+    def __init__(self, temperature=1.0):
+        super().__init__()
+        self.temperature = temperature
+        
+    def forward(self, student_out, teacher_attn_dict, edge_index, mask=None):
+        """
+        Args:
+            student_out: Student logits [N, C]
+            teacher_attn_dict: Dict mapping node -> {neighbor: attn_weight}
+            edge_index: Edge index [2, E]
+            mask: Training node mask
+        """
+        student_feat = F.normalize(F.softmax(student_out / self.temperature, dim=1), p=2, dim=1)
+        
+        if mask is not None:
+            nodes = mask
         else:
-            loss_topo = torch.tensor(0.0, device=student_out.device)
+            nodes = torch.arange(student_out.size(0), device=student_out.device)
         
-        return self.lambda_rkd * loss_rkd + self.lambda_topo * loss_topo
+        # Sample nodes if too many
+        if len(nodes) > 256:
+            perm = torch.randperm(len(nodes), device=nodes.device)[:256]
+            nodes = nodes[perm]
+        
+        total_loss = 0.0
+        valid_nodes = 0
+        
+        for node in nodes:
+            node_idx = node.item()
+            if node_idx not in teacher_attn_dict:
+                continue
+            
+            neighbor_attn = teacher_attn_dict[node_idx]
+            if len(neighbor_attn) < 2:
+                continue
+            
+            neighbors = list(neighbor_attn.keys())
+            teacher_weights = torch.tensor([neighbor_attn[n] for n in neighbors], 
+                                          device=student_out.device)
+            
+            # Normalize teacher attention to probability distribution
+            teacher_dist = F.softmax(teacher_weights / self.temperature, dim=0)
+            
+            # Compute student similarity to neighbors
+            neighbor_indices = torch.tensor(neighbors, device=student_out.device)
+            node_feat = student_feat[node_idx:node_idx+1]
+            neighbor_feat = student_feat[neighbor_indices]
+            student_sim = torch.mm(node_feat, neighbor_feat.t()).squeeze(0)
+            student_dist = F.softmax(student_sim / self.temperature, dim=0)
+            
+            # KL divergence
+            loss = F.kl_div(student_dist.log(), teacher_dist, reduction='sum')
+            total_loss += loss
+            valid_nodes += 1
+        
+        if valid_nodes == 0:
+            return torch.tensor(0.0, device=student_out.device)
+        
+        return total_loss / valid_nodes
+
+
+class HybridContrastiveLoss(nn.Module):
+    """
+    Hybrid Loss combining:
+    1. Contrastive topology loss (margin-based, stable)
+    2. Soft topology loss (attention alignment)
+    3. Standard RKD loss (global relational)
+    
+    L = λ_con * L_contrastive + λ_soft * L_soft + λ_rkd * L_rkd
+    
+    Default weights tuned for stability with KD.
+    """
+    def __init__(self, lambda_con=0.1, lambda_soft=0.5, lambda_rkd=1.0,
+                 temperature=0.5, max_samples=2048):
+        super().__init__()
+        self.lambda_con = lambda_con
+        self.lambda_soft = lambda_soft
+        self.lambda_rkd = lambda_rkd
+        
+        # Use stable margin-based contrastive loss
+        self.contrastive_loss = ContrastiveTopologyLoss(temperature=temperature, margin=0.3)
+        self.soft_loss = SoftTopologyLoss(temperature=1.0)
+        self.max_samples = max_samples
+        
+    def forward(self, student_out, teacher_out, edge_index, 
+                teacher_attn=None, mask=None):
+        """
+        Args:
+            student_out: Student logits
+            teacher_out: Teacher logits
+            edge_index: Graph edges
+            teacher_attn: Optional teacher attention weights
+            mask: Training mask
+        """
+        losses = {}
+        
+        # Contrastive loss
+        if self.lambda_con > 0:
+            loss_con = self.contrastive_loss(student_out, teacher_out, edge_index, mask)
+            losses['contrastive'] = self.lambda_con * loss_con
+        
+        # Soft topology loss (if attention provided)
+        if self.lambda_soft > 0 and teacher_attn is not None:
+            loss_soft = self.soft_loss(student_out, teacher_attn, edge_index, mask)
+            losses['soft_topo'] = self.lambda_soft * loss_soft
+        
+        # RKD loss
+        if self.lambda_rkd > 0:
+            loss_rkd = self._rkd_loss(student_out, teacher_out, mask)
+            losses['rkd'] = self.lambda_rkd * loss_rkd
+        
+        total_loss = sum(losses.values())
+        return total_loss
     
     def _rkd_loss(self, student_out, teacher_out, mask=None):
         """Standard RKD distance loss."""
@@ -199,69 +296,105 @@ class HybridTopologyLoss(nn.Module):
             student_out = student_out[perm]
             teacher_out = teacher_out[perm]
         
-        # Normalize
         student_norm = F.normalize(student_out, p=2, dim=1)
         teacher_norm = F.normalize(teacher_out, p=2, dim=1)
         
-        # Similarity matrices
         student_sim = torch.mm(student_norm, student_norm.t())
         teacher_sim = torch.mm(teacher_norm, teacher_norm.t())
         
-        # MSE loss
         loss = F.mse_loss(student_sim, teacher_sim)
         return loss
+
+
+# ============================================================================
+# Graph Mixup for Data Augmentation
+# ============================================================================
+
+class GraphMixup:
+    """
+    Graph Mixup Augmentation
     
-    def _topo_loss_dense(self, student_out, teacher_out, adj, mask=None):
-        """Topology loss with dense adjacency."""
-        student_feat = F.softmax(student_out, dim=1)
-        teacher_feat = F.softmax(teacher_out, dim=1)
+    Performs mixup in feature space while respecting graph structure.
+    Key for improving MLP robustness and preventing overfitting.
+    
+    Reference: Graph-less Neural Networks, MixHop, etc.
+    """
+    def __init__(self, alpha=0.2, mode='input'):
+        """
+        Args:
+            alpha: Beta distribution parameter for mixup ratio
+            mode: 'input' for input space, 'latent' for latent space
+        """
+        self.alpha = alpha
+        self.mode = mode
         
-        if mask is not None:
-            student_feat = student_feat[mask]
-            teacher_feat = teacher_feat[mask]
-            if adj.is_sparse:
-                adj = adj.to_dense()
-            adj = adj[mask][:, mask]
+    def mixup_features(self, features, labels, edge_index=None):
+        """
+        Perform mixup on node features.
+        
+        Args:
+            features: Node features [N, F]
+            labels: Node labels [N]
+            edge_index: Optional edge index for neighbor-aware mixup
+            
+        Returns:
+            mixed_features, mixed_labels, lambda
+        """
+        batch_size = features.size(0)
+        
+        # Sample mixup ratio from Beta distribution
+        if self.alpha > 0:
+            lam = np.random.beta(self.alpha, self.alpha)
         else:
-            if adj.is_sparse:
-                adj = adj.to_dense()
+            lam = 1.0
         
-        # Compute similarities
-        student_norm = F.normalize(student_feat, p=2, dim=1)
-        teacher_norm = F.normalize(teacher_feat, p=2, dim=1)
-        student_sim = torch.mm(student_norm, student_norm.t())
-        teacher_sim = torch.mm(teacher_norm, teacher_norm.t())
+        # Random permutation for mixing partners
+        if edge_index is not None:
+            # Neighbor-aware mixup: prefer mixing with neighbors
+            mix_indices = self._neighbor_aware_permutation(edge_index, batch_size, features.device)
+        else:
+            mix_indices = torch.randperm(batch_size, device=features.device)
         
-        # Masked loss (only for connected pairs)
-        edge_mask = (adj > 0).float()
-        num_edges = edge_mask.sum()
+        # Mix features
+        mixed_features = lam * features + (1 - lam) * features[mix_indices]
         
-        if num_edges == 0:
-            return torch.tensor(0.0, device=student_out.device)
-        
-        diff = (student_sim - teacher_sim) ** 2
-        loss = (diff * edge_mask).sum() / num_edges
-        return loss
+        return mixed_features, mix_indices, lam
     
-    def _topo_loss_sparse(self, student_out, teacher_out, edge_index, mask=None):
-        """Topology loss with sparse edge_index."""
-        student_feat = F.softmax(student_out, dim=1)
-        teacher_feat = F.softmax(teacher_out, dim=1)
+    def _neighbor_aware_permutation(self, edge_index, num_nodes, device):
+        """Generate permutation preferring neighbors."""
+        # Build adjacency
+        adj_dict = {}
+        src, dst = edge_index[0].cpu().numpy(), edge_index[1].cpu().numpy()
+        for s, d in zip(src, dst):
+            if s not in adj_dict:
+                adj_dict[s] = []
+            adj_dict[s].append(d)
         
-        src, dst = edge_index[0], edge_index[1]
+        # For each node, sample from neighbors with 50% prob, else random
+        perm = []
+        for i in range(num_nodes):
+            if i in adj_dict and len(adj_dict[i]) > 0 and np.random.random() < 0.5:
+                perm.append(np.random.choice(adj_dict[i]))
+            else:
+                perm.append(np.random.randint(0, num_nodes))
         
-        # Sample if too many edges
-        num_edges = edge_index.size(1)
-        if num_edges > self.max_samples * 2:
-            perm = torch.randperm(num_edges, device=edge_index.device)[:self.max_samples * 2]
-            src, dst = src[perm], dst[perm]
+        return torch.tensor(perm, device=device)
+    
+    def mixup_loss(self, pred, labels_a, labels_b, lam, criterion):
+        """
+        Compute mixup loss.
         
-        # Compute similarity for edge pairs
-        student_norm = F.normalize(student_feat, p=2, dim=1)
-        teacher_norm = F.normalize(teacher_feat, p=2, dim=1)
-        
-        student_sim = (student_norm[src] * student_norm[dst]).sum(dim=1)
-        teacher_sim = (teacher_norm[src] * teacher_norm[dst]).sum(dim=1)
-        
-        loss = F.mse_loss(student_sim, teacher_sim)
-        return loss
+        Args:
+            pred: Model predictions
+            labels_a: Original labels
+            labels_b: Mixed partner labels
+            lam: Mixup ratio
+            criterion: Loss function
+        """
+        return lam * criterion(pred, labels_a) + (1 - lam) * criterion(pred, labels_b)
+
+
+# Keep backward compatibility
+TopologyConsistencyLoss = ContrastiveTopologyLoss
+AdaptiveTopologyLoss = ContrastiveTopologyLoss
+HybridTopologyLoss = HybridContrastiveLoss

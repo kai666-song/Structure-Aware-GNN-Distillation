@@ -6,14 +6,22 @@ from scipy.sparse.linalg import eigsh
 import sys
 import torch
 
-# PyTorch Geometric imports for Amazon/Coauthor datasets
+# PyTorch Geometric imports for various datasets
 try:
-    from torch_geometric.datasets import Amazon, Coauthor
+    from torch_geometric.datasets import Amazon, Coauthor, WikipediaNetwork, Actor
     from torch_geometric.transforms import RandomNodeSplit
     HAS_PYG = True
 except ImportError:
     HAS_PYG = False
-    print("Warning: torch_geometric not installed. Amazon/Coauthor datasets unavailable.")
+    print("Warning: torch_geometric not installed. Extended datasets unavailable.")
+
+# OGB imports
+try:
+    from ogb.nodeproppred import PygNodePropPredDataset
+    HAS_OGB = True
+except ImportError:
+    HAS_OGB = False
+    print("Warning: ogb not installed. OGB datasets unavailable.")
 
 
 def parse_index_file(filename):
@@ -35,16 +43,26 @@ def load_data_new(dataset_str):
     """
     Loads input data from gcn/data directory or PyG datasets.
     
-    Supports: cora, citeseer, pubmed, amazon-computers, amazon-photo, 
-              coauthor-cs, coauthor-physics
+    Supports: 
+    - Planetoid: cora, citeseer, pubmed
+    - Amazon: amazon-computers, amazon-photo
+    - Coauthor: coauthor-cs, coauthor-physics
+    - Heterophilic: chameleon, squirrel, actor
+    - OGB: ogbn-arxiv
     """
     dataset_str = dataset_str.lower()
     
-    # Check if it's an Amazon or Coauthor dataset
+    # Check dataset type
     if dataset_str in ['amazon-computers', 'amazon-photo', 'computers', 'photo']:
         return load_amazon_data(dataset_str)
     elif dataset_str in ['coauthor-cs', 'coauthor-physics', 'cs', 'physics']:
         return load_coauthor_data(dataset_str)
+    elif dataset_str in ['chameleon', 'squirrel']:
+        return load_heterophilic_data(dataset_str)
+    elif dataset_str in ['actor']:
+        return load_actor_data()
+    elif dataset_str in ['ogbn-arxiv', 'arxiv']:
+        return load_ogb_arxiv()
     else:
         # Original loading logic for cora, citeseer, pubmed
         return load_planetoid_data(dataset_str)
@@ -134,6 +152,101 @@ def _convert_pyg_to_format(data):
     idx_train = torch.LongTensor(idx_train)
     idx_val = torch.LongTensor(idx_val)
     idx_test = torch.LongTensor(idx_test)
+    
+    return adj, features, labels_tensor, y_train, y_val, y_test, train_mask, val_mask, test_mask, idx_train, idx_val, idx_test
+
+
+def load_heterophilic_data(dataset_str):
+    """Load heterophilic datasets (Chameleon, Squirrel) using PyTorch Geometric.
+    
+    These are important for testing generalization on non-homophilic graphs.
+    """
+    if not HAS_PYG:
+        raise ImportError("torch_geometric required for heterophilic datasets.")
+    
+    # WikipediaNetwork contains Chameleon and Squirrel
+    name = dataset_str.capitalize()
+    transform = RandomNodeSplit(split='train_rest', num_val=0.1, num_test=0.2)
+    dataset = WikipediaNetwork(root='./data/heterophilic', name=name, transform=transform)
+    data = dataset[0]
+    
+    return _convert_pyg_to_format(data)
+
+
+def load_actor_data():
+    """Load Actor dataset (heterophilic) using PyTorch Geometric."""
+    if not HAS_PYG:
+        raise ImportError("torch_geometric required for Actor dataset.")
+    
+    transform = RandomNodeSplit(split='train_rest', num_val=0.1, num_test=0.2)
+    dataset = Actor(root='./data/actor', transform=transform)
+    data = dataset[0]
+    
+    return _convert_pyg_to_format(data)
+
+
+def load_ogb_arxiv():
+    """Load OGB-Arxiv dataset (large-scale graph).
+    
+    This is critical for proving scalability and real-world applicability.
+    ~170k nodes, ~1.2M edges, 40 classes
+    """
+    if not HAS_OGB:
+        raise ImportError("ogb required for OGB datasets. Install with: pip install ogb")
+    
+    dataset = PygNodePropPredDataset(name='ogbn-arxiv', root='./data/ogb')
+    data = dataset[0]
+    split_idx = dataset.get_idx_split()
+    
+    # Get features and labels
+    features = data.x.numpy()
+    labels = data.y.squeeze().numpy()
+    num_nodes = features.shape[0]
+    num_classes = int(labels.max()) + 1
+    
+    # Build adjacency matrix from edge_index
+    edge_index = data.edge_index.numpy()
+    adj = sp.coo_matrix(
+        (np.ones(edge_index.shape[1]), (edge_index[0], edge_index[1])),
+        shape=(num_nodes, num_nodes)
+    )
+    adj = adj.tocsr()
+    
+    # Get split indices
+    idx_train = split_idx['train'].numpy()
+    idx_val = split_idx['valid'].numpy()
+    idx_test = split_idx['test'].numpy()
+    
+    # Create masks
+    train_mask = np.zeros(num_nodes, dtype=bool)
+    val_mask = np.zeros(num_nodes, dtype=bool)
+    test_mask = np.zeros(num_nodes, dtype=bool)
+    train_mask[idx_train] = True
+    val_mask[idx_val] = True
+    test_mask[idx_test] = True
+    
+    # Create one-hot labels
+    labels_onehot = np.zeros((num_nodes, num_classes))
+    labels_onehot[np.arange(num_nodes), labels] = 1
+    
+    y_train = np.zeros(labels_onehot.shape)
+    y_val = np.zeros(labels_onehot.shape)
+    y_test = np.zeros(labels_onehot.shape)
+    y_train[train_mask, :] = labels_onehot[train_mask, :]
+    y_val[val_mask, :] = labels_onehot[val_mask, :]
+    y_test[test_mask, :] = labels_onehot[test_mask, :]
+    
+    # Convert to sparse features
+    features = sp.lil_matrix(features)
+    
+    # Convert to torch tensors
+    labels_tensor = torch.LongTensor(labels)
+    idx_train = torch.LongTensor(idx_train)
+    idx_val = torch.LongTensor(idx_val)
+    idx_test = torch.LongTensor(idx_test)
+    
+    print(f"OGB-Arxiv loaded: {num_nodes} nodes, {edge_index.shape[1]} edges, {num_classes} classes")
+    print(f"Train/Val/Test: {len(idx_train)}/{len(idx_val)}/{len(idx_test)}")
     
     return adj, features, labels_tensor, y_train, y_val, y_test, train_mask, val_mask, test_mask, idx_train, idx_val, idx_test
 

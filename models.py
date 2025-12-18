@@ -111,6 +111,8 @@ class GAT(nn.Module):
     Uses multi-head attention in first layer, single head in output layer.
     Typically achieves 1-2% higher accuracy than GCN.
     
+    Can return attention weights for soft topology distillation.
+    
     Args:
         nfeat: Input feature dimension
         nhid: Hidden dimension (per head)
@@ -128,8 +130,9 @@ class GAT(nn.Module):
             raise ImportError("torch_geometric required for GAT. Install with: pip install torch_geometric")
         
         self.dropout = dropout
+        self.heads = heads
         
-        # First GAT layer: multi-head attention
+        # First GAT layer: multi-head attention (return attention weights)
         # Output: nhid * heads features
         self.gat1 = GATConv(nfeat, nhid, heads=heads, dropout=dropout)
         
@@ -137,23 +140,36 @@ class GAT(nn.Module):
         # Input: nhid * heads, Output: nclass
         self.gat2 = GATConv(nhid * heads, nclass, heads=1, concat=False, dropout=dropout)
         
-    def forward(self, x, edge_index):
+    def forward(self, x, edge_index, return_attention=False):
         """
         Args:
             x: Node features [N, nfeat]
             edge_index: Edge index [2, E] in PyG format
+            return_attention: If True, also return attention weights
+            
+        Returns:
+            x: Output logits [N, nclass]
+            attn_weights: (optional) Tuple of (attn1, attn2) attention weights
         """
         if x.is_sparse:
             x = x.to_dense()
         x = x.float()
         
         x = F.dropout(x, p=self.dropout, training=self.training)
-        x = self.gat1(x, edge_index)
-        x = F.elu(x)
-        x = F.dropout(x, p=self.dropout, training=self.training)
-        x = self.gat2(x, edge_index)
         
-        return x
+        if return_attention:
+            x, (edge_index1, attn1) = self.gat1(x, edge_index, return_attention_weights=True)
+            x = F.elu(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
+            x, (edge_index2, attn2) = self.gat2(x, edge_index, return_attention_weights=True)
+            # attn1: [E, heads], attn2: [E, 1]
+            return x, (attn1, attn2, edge_index1)
+        else:
+            x = self.gat1(x, edge_index)
+            x = F.elu(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
+            x = self.gat2(x, edge_index)
+            return x
 
 
 class GATv2(nn.Module):
@@ -161,6 +177,7 @@ class GATv2(nn.Module):
     
     Uses GATv2Conv which fixes the static attention problem in original GAT.
     Generally more expressive and achieves better results.
+    Can return attention weights for soft topology distillation.
     """
     def __init__(self, nfeat, nhid, nclass, dropout, heads=8):
         super(GATv2, self).__init__()
@@ -171,21 +188,29 @@ class GATv2(nn.Module):
         from torch_geometric.nn import GATv2Conv
         
         self.dropout = dropout
+        self.heads = heads
         self.gat1 = GATv2Conv(nfeat, nhid, heads=heads, dropout=dropout)
         self.gat2 = GATv2Conv(nhid * heads, nclass, heads=1, concat=False, dropout=dropout)
         
-    def forward(self, x, edge_index):
+    def forward(self, x, edge_index, return_attention=False):
         if x.is_sparse:
             x = x.to_dense()
         x = x.float()
         
         x = F.dropout(x, p=self.dropout, training=self.training)
-        x = self.gat1(x, edge_index)
-        x = F.elu(x)
-        x = F.dropout(x, p=self.dropout, training=self.training)
-        x = self.gat2(x, edge_index)
         
-        return x
+        if return_attention:
+            x, (edge_index1, attn1) = self.gat1(x, edge_index, return_attention_weights=True)
+            x = F.elu(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
+            x, (edge_index2, attn2) = self.gat2(x, edge_index, return_attention_weights=True)
+            return x, (attn1, attn2, edge_index1)
+        else:
+            x = self.gat1(x, edge_index)
+            x = F.elu(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
+            x = self.gat2(x, edge_index)
+            return x
 
 
 def convert_adj_to_edge_index(adj):
