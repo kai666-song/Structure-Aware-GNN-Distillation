@@ -278,6 +278,19 @@ When Student flips Teacher's errors, the average wrong neighbor ratio is **37.8%
 | Squirrel | 5,201 | 217,073 | 2,089 | 5 | Heterophilic |
 | Actor | 7,600 | 33,544 | 932 | 5 | Heterophilic |
 
+### Data Split Standards
+
+For **heterophilic datasets** (Actor, Chameleon, Squirrel), we use the **Geom-GCN standard splits** (Pei et al., ICLR 2020):
+- **10 fixed random splits** with **48% / 32% / 20%** train/val/test ratio
+- This ensures **fair comparison** with published baselines (GCNII, GPR-GNN, H2GCN, etc.)
+- Verified via `verify_splits.py` - all datasets correctly load 2D masks with 10 splits
+
+For **homophilic datasets** (Cora, Citeseer, PubMed):
+- Standard Planetoid splits (fixed train/val/test indices)
+
+For **Amazon datasets**:
+- Random 70% / 10% / 20% splits with fixed seed for reproducibility
+
 ## 📖 References
 
 ```bibtex

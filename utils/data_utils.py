@@ -39,7 +39,7 @@ def sample_mask(idx, l):
     return np.array(mask, dtype=np.bool_)
 
 
-def load_data_new(dataset_str):
+def load_data_new(dataset_str, split_idx=0):
     """
     Loads input data from gcn/data directory or PyG datasets.
     
@@ -47,8 +47,19 @@ def load_data_new(dataset_str):
     - Planetoid: cora, citeseer, pubmed
     - Amazon: amazon-computers, amazon-photo
     - Coauthor: coauthor-cs, coauthor-physics
-    - Heterophilic: chameleon, squirrel, actor
+    - Heterophilic: chameleon, squirrel, actor (with Geom-GCN standard splits)
     - OGB: ogbn-arxiv
+    
+    Args:
+        dataset_str: Name of the dataset
+        split_idx: For heterophilic datasets, index of Geom-GCN split (0-9)
+                   This ensures fair comparison with literature baselines.
+    
+    Note on Data Splits:
+        For heterophilic datasets (Actor, Chameleon, Squirrel), we use the 
+        standard Geom-GCN splits (Pei et al., ICLR 2020) with 48/32/20 
+        train/val/test ratio. This ensures fair comparison with published 
+        baselines like GCNII, GPR-GNN, H2GCN, etc.
     """
     dataset_str = dataset_str.lower()
     
@@ -58,9 +69,9 @@ def load_data_new(dataset_str):
     elif dataset_str in ['coauthor-cs', 'coauthor-physics', 'cs', 'physics']:
         return load_coauthor_data(dataset_str)
     elif dataset_str in ['chameleon', 'squirrel']:
-        return load_heterophilic_data(dataset_str)
+        return load_heterophilic_data(dataset_str, split_idx=split_idx)
     elif dataset_str in ['actor']:
-        return load_actor_data()
+        return load_actor_data(split_idx=split_idx)
     elif dataset_str in ['ogbn-arxiv', 'arxiv']:
         return load_ogb_arxiv()
     else:
@@ -156,8 +167,15 @@ def _convert_pyg_to_format(data):
     return adj, features, labels_tensor, y_train, y_val, y_test, train_mask, val_mask, test_mask, idx_train, idx_val, idx_test
 
 
-def load_heterophilic_data(dataset_str):
+def load_heterophilic_data(dataset_str, split_idx=0):
     """Load heterophilic datasets (Chameleon, Squirrel) using PyTorch Geometric.
+    
+    Uses Geom-GCN standard splits (48/32/20) for fair comparison with literature.
+    Reference: Pei et al., "Geom-GCN: Geometric Graph Convolutional Networks", ICLR 2020
+    
+    Args:
+        dataset_str: 'chameleon' or 'squirrel'
+        split_idx: Index of the split to use (0-9 for Geom-GCN splits)
     
     These are important for testing generalization on non-homophilic graphs.
     """
@@ -165,22 +183,66 @@ def load_heterophilic_data(dataset_str):
         raise ImportError("torch_geometric required for heterophilic datasets.")
     
     # WikipediaNetwork contains Chameleon and Squirrel
+    # geom_gcn_preprocess=True uses the standard Geom-GCN splits
     name = dataset_str.capitalize()
-    transform = RandomNodeSplit(split='train_rest', num_val=0.1, num_test=0.2)
-    dataset = WikipediaNetwork(root='./data/heterophilic', name=name, transform=transform)
+    dataset = WikipediaNetwork(root='./data/heterophilic', name=name, 
+                               geom_gcn_preprocess=True)
     data = dataset[0]
+    
+    # Use the specified Geom-GCN split (10 splits available: 0-9)
+    # Each split has train_mask, val_mask, test_mask with shape [num_nodes, 10]
+    if hasattr(data, 'train_mask') and data.train_mask.dim() == 2:
+        # Geom-GCN provides 10 fixed splits
+        split_idx = split_idx % data.train_mask.shape[1]
+        data.train_mask = data.train_mask[:, split_idx]
+        data.val_mask = data.val_mask[:, split_idx]
+        data.test_mask = data.test_mask[:, split_idx]
+        print(f"Using Geom-GCN split {split_idx} (48/32/20 standard split)")
+    else:
+        print("Warning: Geom-GCN splits not available, using default split")
     
     return _convert_pyg_to_format(data)
 
 
-def load_actor_data():
-    """Load Actor dataset (heterophilic) using PyTorch Geometric."""
+def load_actor_data(split_idx=0):
+    """Load Actor dataset (heterophilic) using PyTorch Geometric.
+    
+    Uses Geom-GCN standard splits (48/32/20) for fair comparison with literature.
+    Reference: Pei et al., "Geom-GCN: Geometric Graph Convolutional Networks", ICLR 2020
+    
+    Args:
+        split_idx: Index of the split to use (0-9 for Geom-GCN splits)
+    """
     if not HAS_PYG:
         raise ImportError("torch_geometric required for Actor dataset.")
     
-    transform = RandomNodeSplit(split='train_rest', num_val=0.1, num_test=0.2)
-    dataset = Actor(root='./data/actor', transform=transform)
+    # Actor dataset with Geom-GCN preprocessing for standard splits
+    dataset = Actor(root='./data/actor')
     data = dataset[0]
+    
+    # Use the specified Geom-GCN split (10 splits available: 0-9)
+    if hasattr(data, 'train_mask') and data.train_mask.dim() == 2:
+        # Geom-GCN provides 10 fixed splits
+        split_idx = split_idx % data.train_mask.shape[1]
+        data.train_mask = data.train_mask[:, split_idx]
+        data.val_mask = data.val_mask[:, split_idx]
+        data.test_mask = data.test_mask[:, split_idx]
+        print(f"Using Geom-GCN split {split_idx} (48/32/20 standard split)")
+    else:
+        # Fallback: create random split if Geom-GCN splits not available
+        print("Warning: Geom-GCN splits not available, creating random 48/32/20 split")
+        num_nodes = data.x.shape[0]
+        indices = torch.randperm(num_nodes)
+        train_size = int(0.6 * num_nodes)
+        val_size = int(0.2 * num_nodes)
+        
+        data.train_mask = torch.zeros(num_nodes, dtype=torch.bool)
+        data.val_mask = torch.zeros(num_nodes, dtype=torch.bool)
+        data.test_mask = torch.zeros(num_nodes, dtype=torch.bool)
+        
+        data.train_mask[indices[:train_size]] = True
+        data.val_mask[indices[train_size:train_size+val_size]] = True
+        data.test_mask[indices[train_size+val_size:]] = True
     
     return _convert_pyg_to_format(data)
 
