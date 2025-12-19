@@ -114,16 +114,36 @@ python experiments_improved.py --experiment citeseer_optimize --num_runs 10
 python experiments_improved.py --experiment all --num_runs 10
 ```
 
+### Advanced Analysis (NEW)
+
+```bash
+# Run all advanced analyses
+python run_analysis.py --all --num_runs 5
+
+# Individual analyses
+python run_analysis.py --homophily --data actor    # Node-level homophily analysis
+python run_analysis.py --robustness --all_data     # Graph perturbation robustness
+python run_analysis.py --ablation                  # Detailed ablation study
+python run_analysis.py --error --data actor        # Error analysis & case study
+```
+
 ## 📁 Project Structure
 
 ```
+├── main.py                   # Unified entry point
 ├── models.py                 # GCN, GAT, MLP, MLPBatchNorm definitions
 ├── layers.py                 # Graph convolution layer
 ├── distill_gat.py           # Main distillation script (GAT teacher)
 ├── distill.py               # Distillation with GCN teacher
 ├── experiments_improved.py   # Heterophilic + significance tests
 ├── benchmark.py             # Baseline performance benchmark
-├── ablation_study.py        # Ablation experiments
+├── run_analysis.py          # Advanced analysis runner
+│
+├── analysis/                # Advanced analysis modules (NEW)
+│   ├── homophily_analysis.py   # Node-level homophily study
+│   ├── robustness_study.py     # Graph perturbation robustness
+│   ├── ablation_detailed.py    # Granular ablation study
+│   └── error_analysis.py       # Error analysis & case study
 │
 ├── kd_losses/               # Knowledge distillation losses
 │   ├── st.py               # Soft Target (KL divergence)
