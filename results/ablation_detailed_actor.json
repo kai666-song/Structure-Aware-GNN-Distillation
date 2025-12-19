@@ -1,0 +1,50 @@
+{
+  "dataset": "actor",
+  "configs": {
+    "Task Only": {
+      "acc_mean": 33.8684219121933,
+      "acc_std": 1.9037612106808732,
+      "epoch_mean": 22.2,
+      "epoch_std": 37.90725524223562,
+      "use_kd": false,
+      "use_rkd": false,
+      "use_tcd": false
+    },
+    "+ KD": {
+      "acc_mean": 35.81579089164734,
+      "acc_std": 0.49861263956344687,
+      "epoch_mean": 137.6,
+      "epoch_std": 69.74123600854806,
+      "use_kd": true,
+      "use_rkd": false,
+      "use_tcd": false
+    },
+    "+ KD + RKD": {
+      "acc_mean": 36.02631747722626,
+      "acc_std": 0.4700144340307961,
+      "epoch_mean": 146.8,
+      "epoch_std": 74.09561390527782,
+      "use_kd": true,
+      "use_rkd": true,
+      "use_tcd": false
+    },
+    "+ KD + TCD": {
+      "acc_mean": 32.77631759643555,
+      "acc_std": 0.9770570039584556,
+      "epoch_mean": 59.0,
+      "epoch_std": 66.20876074961681,
+      "use_kd": true,
+      "use_rkd": false,
+      "use_tcd": true
+    },
+    "+ KD + RKD + TCD (Full)": {
+      "acc_mean": 32.302632331848145,
+      "acc_std": 0.4423089184934543,
+      "epoch_mean": 159.8,
+      "epoch_std": 27.570999256465118,
+      "use_kd": true,
+      "use_rkd": true,
+      "use_tcd": true
+    }
+  }
+}

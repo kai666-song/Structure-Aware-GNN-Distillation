@@ -1,0 +1,50 @@
+{
+  "dataset": "cora",
+  "configs": {
+    "Task Only": {
+      "acc_mean": 45.18000245094299,
+      "acc_std": 0.9325228935279213,
+      "epoch_mean": 92.4,
+      "epoch_std": 79.64571551565093,
+      "use_kd": false,
+      "use_rkd": false,
+      "use_tcd": false
+    },
+    "+ KD": {
+      "acc_mean": 82.98000454902649,
+      "acc_std": 1.355582422738273,
+      "epoch_mean": 205.8,
+      "epoch_std": 49.28853822137557,
+      "use_kd": true,
+      "use_rkd": false,
+      "use_tcd": false
+    },
+    "+ KD + RKD": {
+      "acc_mean": 82.90000438690186,
+      "acc_std": 0.5692112370846304,
+      "epoch_mean": 212.0,
+      "epoch_std": 34.652561232901675,
+      "use_kd": true,
+      "use_rkd": true,
+      "use_tcd": false
+    },
+    "+ KD + TCD": {
+      "acc_mean": 83.5200047492981,
+      "acc_std": 0.6209668256720241,
+      "epoch_mean": 138.2,
+      "epoch_std": 44.38648442938458,
+      "use_kd": true,
+      "use_rkd": false,
+      "use_tcd": true
+    },
+    "+ KD + RKD + TCD (Full)": {
+      "acc_mean": 83.6400043964386,
+      "acc_std": 0.5122480448647195,
+      "epoch_mean": 128.4,
+      "epoch_std": 49.58064138350773,
+      "use_kd": true,
+      "use_rkd": true,
+      "use_tcd": true
+    }
+  }
+}
