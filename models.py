@@ -231,3 +231,179 @@ def convert_adj_to_edge_index(adj):
         edge_index = adj.nonzero().t().contiguous()
     
     return edge_index
+
+
+# ============================================================================
+# GCNII: Deep GCN with Initial Residual and Identity Mapping
+# Designed for heterophilic graphs - stronger teacher for Actor/Squirrel
+# ============================================================================
+
+class GCNII(nn.Module):
+    """
+    GCNII: Simple and Deep Graph Convolutional Networks
+    
+    Reference: Chen et al. "Simple and Deep Graph Convolutional Networks" (ICML 2020)
+    
+    Key innovations:
+    1. Initial residual connection: H^(l+1) = ((1-α)H^(l) + αH^(0))W
+    2. Identity mapping: Prevents over-smoothing in deep networks
+    
+    Works well on heterophilic graphs where standard GCN/GAT fail.
+    
+    Args:
+        nfeat: Input feature dimension
+        nhid: Hidden dimension
+        nclass: Number of classes
+        dropout: Dropout rate
+        num_layers: Number of GCNII layers (can be deep, e.g., 64)
+        alpha: Initial residual weight (typically 0.1-0.5)
+        theta: Identity mapping weight (typically 0.5-1.0)
+    """
+    def __init__(self, nfeat, nhid, nclass, dropout, num_layers=8, alpha=0.1, theta=0.5):
+        super(GCNII, self).__init__()
+        
+        if not HAS_PYG:
+            raise ImportError("torch_geometric required for GCNII")
+        
+        from torch_geometric.nn import GCN2Conv
+        
+        self.dropout = dropout
+        self.num_layers = num_layers
+        self.alpha = alpha
+        self.theta = theta
+        
+        # Initial projection
+        self.fc_in = nn.Linear(nfeat, nhid)
+        self.bn_in = nn.BatchNorm1d(nhid)
+        
+        # GCNII layers
+        self.convs = nn.ModuleList()
+        self.bns = nn.ModuleList()
+        for i in range(num_layers):
+            self.convs.append(GCN2Conv(nhid, alpha=alpha, theta=theta, layer=i+1))
+            self.bns.append(nn.BatchNorm1d(nhid))
+        
+        # Output projection
+        self.fc_out = nn.Linear(nhid, nclass)
+        
+    def forward(self, x, edge_index):
+        if x.is_sparse:
+            x = x.to_dense()
+        x = x.float()
+        
+        # Initial projection
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x = self.fc_in(x)
+        x = self.bn_in(x)
+        x = F.relu(x)
+        
+        x_0 = x  # Save initial representation for residual
+        
+        # GCNII layers
+        for i, (conv, bn) in enumerate(zip(self.convs, self.bns)):
+            x = F.dropout(x, p=self.dropout, training=self.training)
+            x = conv(x, x_0, edge_index)
+            x = bn(x)
+            x = F.relu(x)
+        
+        # Output
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x = self.fc_out(x)
+        
+        return x
+
+
+# ============================================================================
+# GPR-GNN: Generalized PageRank GNN (Adaptive for Heterophilic Graphs)
+# ============================================================================
+
+class GPRGNN(nn.Module):
+    """
+    GPR-GNN: Generalized PageRank Graph Neural Network
+    
+    Reference: Chien et al. "Adaptive Universal Generalized PageRank Graph Neural Network" (ICLR 2021)
+    
+    Key innovation: Learns adaptive weights for different propagation steps,
+    allowing negative weights to handle heterophilic graphs.
+    
+    H = sum_{k=0}^{K} gamma_k * A^k * X * W
+    
+    where gamma_k are learnable (can be negative for heterophily).
+    
+    Args:
+        nfeat: Input feature dimension
+        nhid: Hidden dimension
+        nclass: Number of classes
+        dropout: Dropout rate
+        K: Number of propagation steps
+        alpha: Initial PageRank teleport probability
+    """
+    def __init__(self, nfeat, nhid, nclass, dropout, K=10, alpha=0.1):
+        super(GPRGNN, self).__init__()
+        
+        self.dropout = dropout
+        self.K = K
+        
+        # Feature transformation
+        self.fc1 = nn.Linear(nfeat, nhid)
+        self.fc2 = nn.Linear(nhid, nclass)
+        
+        # Learnable GPR weights (initialized with PPR)
+        # gamma_k = alpha * (1-alpha)^k
+        init_gamma = alpha * (1 - alpha) ** torch.arange(K + 1).float()
+        self.gamma = nn.Parameter(init_gamma)
+        
+    def forward(self, x, edge_index):
+        import torch
+        from torch_sparse import SparseTensor
+        
+        if x.is_sparse:
+            x = x.to_dense()
+        x = x.float()
+        
+        num_nodes = x.size(0)
+        
+        # Feature transformation
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        x = F.relu(self.fc1(x))
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        h = self.fc2(x)
+        
+        # Build normalized adjacency
+        row, col = edge_index[0], edge_index[1]
+        deg = torch.zeros(num_nodes, device=x.device)
+        deg.scatter_add_(0, row, torch.ones_like(row, dtype=torch.float))
+        deg_inv_sqrt = deg.pow(-0.5)
+        deg_inv_sqrt[deg_inv_sqrt == float('inf')] = 0
+        
+        # Propagation with learnable weights
+        out = self.gamma[0] * h
+        h_k = h
+        
+        for k in range(1, self.K + 1):
+            # Sparse matrix multiplication: A * h_k
+            # Using scatter for efficiency
+            h_k_new = torch.zeros_like(h_k)
+            norm = deg_inv_sqrt[row] * deg_inv_sqrt[col]
+            h_k_new.scatter_add_(0, col.unsqueeze(1).expand(-1, h_k.size(1)), 
+                                  h_k[row] * norm.unsqueeze(1))
+            h_k = h_k_new
+            out = out + self.gamma[k] * h_k
+        
+        return out
+
+
+# Simple wrapper to use GCNII with adjacency matrix format
+class GCNIIWrapper(nn.Module):
+    """Wrapper for GCNII that accepts adjacency matrix and converts to edge_index."""
+    def __init__(self, nfeat, nhid, nclass, dropout, num_layers=8, alpha=0.1, theta=0.5):
+        super().__init__()
+        self.gcnii = GCNII(nfeat, nhid, nclass, dropout, num_layers, alpha, theta)
+        
+    def forward(self, x, adj_or_edge_index):
+        # Check if input is edge_index (2D with shape [2, E]) or adjacency matrix
+        if adj_or_edge_index.dim() == 2 and adj_or_edge_index.size(0) == 2:
+            edge_index = adj_or_edge_index
+        else:
+            edge_index = convert_adj_to_edge_index(adj_or_edge_index)
+        return self.gcnii(x, edge_index)
