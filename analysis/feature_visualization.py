@@ -288,8 +288,8 @@ def run_feature_analysis(dataset='actor', num_runs=3, device='cuda'):
         for key in metrics_list[0].keys():
             values = [m[key] for m in metrics_list]
             avg_metrics[key] = {
-                'mean': np.mean(values),
-                'std': np.std(values)
+                'mean': float(np.mean(values)),
+                'std': float(np.std(values))
             }
         
         summary[model_name] = avg_metrics
