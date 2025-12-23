@@ -218,15 +218,16 @@ def main():
                        help='Path to teacher logits file')
     parser.add_argument('--save_dir', type=str, default='./data',
                        help='Directory to save weight files')
-    parser.add_argument('--soft', action='store_true', default=True,
-                       help='Use soft (cosine similarity) homophily')
-    parser.add_argument('--hard', action='store_true',
-                       help='Use hard (class match) homophily')
+    parser.add_argument('--soft', action='store_true',
+                       help='Use soft (cosine similarity) homophily - NOT recommended')
+    parser.add_argument('--hard', action='store_true', default=True,
+                       help='Use hard (class match) homophily - RECOMMENDED')
     parser.add_argument('--run_teacher', action='store_true',
                        help='Run GloGNN++ teacher to generate logits first')
     args = parser.parse_args()
     
-    soft = not args.hard
+    # Default to hard homophily (class match) - more reliable for heterophilic graphs
+    soft = args.soft and not args.hard
     
     if args.run_teacher:
         print("Running GloGNN++ teacher to generate logits...")
