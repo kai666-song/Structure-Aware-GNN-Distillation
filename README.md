@@ -6,6 +6,50 @@
 
 > **Transferring Graph Neural Network Knowledge to MLP with Topology-Aware Distillation**
 
+---
+
+## 🚨 Phase 1: Establish the True Bar (已完成 ✅)
+
+### 目标
+抛弃 GAT 作为基线，找到真正的对手，确立必须超越的分数线。
+
+### 真正的基线结果 (Strong Baselines)
+
+| Dataset | GAT (旧基线) | GloGNN++ (实测) | ACM-GNN (实测) | 我们需要超越 |
+|---------|-------------|-----------------|----------------|-------------|
+| Actor | 27.16% | **37.34% ± 0.70%** ✅ | 35.13% | > 37.5% |
+| Squirrel | 33.15% | **66.44% ± 1.96%** ✅ | TBD | > 66% |
+
+### 关键发现
+1. **GloGNN++ 在 Actor 上达到 37.34%**，远超 GAT 的 27.16%
+2. **GloGNN++ 在 Squirrel 上达到 66.44%**，远超目标 38%（文献报告值偏低）
+3. 这些才是我们真正需要超越的"及格线"
+
+### 运行基线评估
+
+```bash
+# 运行所有基线
+python run_phase1_baselines.py --all
+
+# 单独运行 GloGNN++
+python run_phase1_baselines.py --glognn --dataset actor
+
+# 运行 ACM-GNN 并保存 Teacher 模型
+python run_phase1_baselines.py --acmgnn --dataset actor --save_teacher
+
+# 快速测试（1 split）
+python baselines/quick_test.py
+```
+
+### 下一步计划
+1. ✅ 部署 GloGNN++ 和 ACM-GNN 基线代码
+2. ✅ 在 Geom-GCN splits (10 folds) 上运行基线
+3. ✅ 确认基线性能达到文献报告水平
+4. ⏳ 选择最强的 Teacher (GloGNN++) 并保存 soft logits
+5. ⏳ 开始知识蒸馏实验，目标超越 GloGNN++
+
+---
+
 This repository implements **Structure-Aware Knowledge Distillation** for Graph Neural Networks, enabling lightweight MLP models to achieve competitive (and sometimes superior!) performance compared to GNN teachers, without requiring graph structure during inference.
 
 ## 🌟 Highlights
