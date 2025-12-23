@@ -256,7 +256,7 @@ def run_dirichlet_energy_experiment(dataset='actor', num_runs=5, device='cuda'):
         features_tensor = torch.FloatTensor(features_np).to(device)
         labels_tensor = labels.to(device)
         
-        teacher = GAT(n_features, 8, n_classes, dropout=0.6, alpha=0.2, nheads=8).to(device)
+        teacher = GAT(n_features, 8, n_classes, dropout=0.6, heads=8).to(device)
         optimizer = optim.Adam(teacher.parameters(), lr=0.005, weight_decay=5e-4)
         
         # Train teacher
@@ -346,7 +346,7 @@ def train_with_gamma(features, labels, adj, idx_train, idx_val, idx_test,
     labels_tensor = labels.to(device)
     
     # Train Teacher
-    teacher = GAT(n_features, 8, n_classes, dropout=0.6, alpha=0.2, nheads=8).to(device)
+    teacher = GAT(n_features, 8, n_classes, dropout=0.6, heads=8).to(device)
     optimizer = optim.Adam(teacher.parameters(), lr=0.005, weight_decay=5e-4)
     
     for epoch in range(200):
