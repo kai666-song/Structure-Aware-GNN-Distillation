@@ -11,12 +11,12 @@ This repository implements **Structure-Aware Knowledge Distillation** for Graph 
 ## 🌟 Highlights
 
 - **Student Beats Teacher**: On Actor dataset, Student MLP outperforms Teacher GAT by **6.33%** (p < 0.001)
+- **Student > Vanilla MLP**: Distillation improves over vanilla MLP by +0.93% on Actor
 - **+18% in Heterophilic Regions**: In extremely heterophilic nodes (homophily 0.0-0.2), Student beats Teacher by 18%!
+- **No Oversmoothing**: Student preserves 90% of input feature energy (Dirichlet: 2.97 vs Teacher's 0.13)
 - **100% Robust to Graph Noise**: Student MLP is completely immune to graph perturbation
 - **Stronger Teacher Validated**: With GCNII teacher (SOTA), Student still beats Teacher by +1.39%
-- **More Compact Features**: Student's feature space is 21.4% more compact (Davies-Bouldin: 14.01 vs 18.35)
-- **Faster Convergence**: TCD loss reduces training epochs by 38% while improving accuracy
-- **Statistical Significance**: 2 datasets show significant improvements with p < 0.01
+- **Adaptive TCD**: TCD helps on homophilic graphs (gamma=0.3), but should be disabled on heterophilic graphs
 - **4-10x Faster Inference**: MLP requires no graph structure at test time
 
 ## 📊 Main Results
@@ -235,6 +235,39 @@ When Student flips Teacher's errors, the average wrong neighbor ratio is **37.8%
 | Compactness Ratio ↓ | 4.99 ± 0.16 | **3.92 ± 0.22** | 21.4% better |
 
 > **Key Insight**: Student MLP learns a more discriminative and compact feature space than Teacher GAT, explaining its superior generalization on heterophilic graphs.
+
+## 🔴 Critical Validation (Red Team Defense)
+
+### Vanilla MLP Baseline
+
+**Q: Is distillation actually helping?**
+
+| Dataset | Vanilla MLP | Distilled Student | Gap |
+|---------|-------------|-------------------|-----|
+| Actor | 34.37% | **35.30%** | **+0.93%** ✅ |
+| Cora | 55.30% | **80.54%** | **+25.24%** ✅ |
+
+### Dirichlet Energy (Oversmoothing Analysis)
+
+**Q: Does Student oversmooth like GNNs?**
+
+| Dataset | Teacher (GAT) | Student (MLP) | Conclusion |
+|---------|---------------|---------------|------------|
+| Actor | 0.13 | **2.97** | Student preserves 90% of input energy! |
+| Cora | 0.28 | **0.35** | Student slightly sharper |
+
+> GAT severely oversmooths (energy 0.13 vs input 3.31). MLP preserves high-frequency information.
+
+### Gamma (TCD Weight) Sensitivity
+
+**Q: Is TCD loss actually beneficial?**
+
+| Dataset | Best Gamma | Conclusion |
+|---------|------------|------------|
+| Cora (homophilic) | **0.3** | ✅ TCD helps |
+| Actor (heterophilic) | **0.0** | ⚠️ TCD hurts |
+
+> **Adaptive Recommendation**: Use TCD on homophilic graphs, disable on heterophilic graphs.
 
 ## 📊 Original Ablation Study
 
