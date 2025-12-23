@@ -79,6 +79,29 @@ This proves our Spectral-Decoupled Loss correctly handles heterophilic graphs!
 
 ---
 
+## Table 4: Efficiency Benchmark (Actor Dataset)
+
+| Metric | GloGNN++ (Teacher) | EnhancedMLP (Ours) | Improvement |
+|--------|-------------------|-------------------|-------------|
+| Parameters | 546,546 | **379,245** | 1.44x smaller |
+| Model Size | 4.17 MB | **1.45 MB** | 2.88x smaller |
+| Inference Time | 46.95 ms | **32.58 ms** | **1.44x faster** |
+| Throughput | 161,889 nodes/s | **233,278 nodes/s** | 1.44x higher |
+| Requires Graph | Yes | **No** | ✅ Graph-free |
+
+### Key Efficiency Gains
+
+1. **1.44x faster inference** without graph structure
+2. **2.88x smaller model** in memory
+3. **Graph-free inference**: No adjacency matrix needed at test time!
+
+This is critical for deployment scenarios where:
+- Graph structure is unavailable at inference
+- Low latency is required
+- Memory is constrained
+
+---
+
 ## Technical Details
 
 ### Model Architecture

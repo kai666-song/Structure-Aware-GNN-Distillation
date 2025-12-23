@@ -1,0 +1,27 @@
+{
+  "dataset": "actor",
+  "device": "cpu",
+  "teacher": {
+    "model": "GloGNN++",
+    "params": 546546,
+    "size_mb": 4.1698150634765625,
+    "time_mean": 46.94563600005495,
+    "time_std": 3.1666600101997844,
+    "throughput": 161889.3820075439,
+    "num_nodes": 7600,
+    "requires_graph": true
+  },
+  "student": {
+    "model": "EnhancedMLP (Ours)",
+    "params": 379245,
+    "size_mb": 1.4467048645019531,
+    "time_mean": 32.57908799994766,
+    "time_std": 1.70334202734972,
+    "throughput": 233278.4760583909,
+    "num_nodes": 7600,
+    "requires_graph": false
+  },
+  "speedup": 1.440974529432204,
+  "param_ratio": 1.4411422695091562,
+  "timestamp": "2025-12-23T23:52:18.947752"
+}
