@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pickle as pkl
 import networkx as nx
@@ -39,7 +40,7 @@ def sample_mask(idx, l):
     return np.array(mask, dtype=np.bool_)
 
 
-def load_data_new(dataset_str, split_idx=0):
+def load_data_new(dataset_str, split_idx=0, use_pe=False, pe_dim=16):
     """
     Loads input data from gcn/data directory or PyG datasets.
     
@@ -54,6 +55,8 @@ def load_data_new(dataset_str, split_idx=0):
         dataset_str: Name of the dataset
         split_idx: For heterophilic datasets, index of Geom-GCN split (0-9)
                    This ensures fair comparison with literature baselines.
+        use_pe: If True, concatenate positional encoding to features
+        pe_dim: Dimension of positional encoding (default: 16)
     
     Note on Data Splits:
         For heterophilic datasets (Actor, Chameleon, Squirrel), we use the 
@@ -65,18 +68,70 @@ def load_data_new(dataset_str, split_idx=0):
     
     # Check dataset type
     if dataset_str in ['amazon-computers', 'amazon-photo', 'computers', 'photo']:
-        return load_amazon_data(dataset_str)
+        result = load_amazon_data(dataset_str)
     elif dataset_str in ['coauthor-cs', 'coauthor-physics', 'cs', 'physics']:
-        return load_coauthor_data(dataset_str)
+        result = load_coauthor_data(dataset_str)
     elif dataset_str in ['chameleon', 'squirrel']:
-        return load_heterophilic_data(dataset_str, split_idx=split_idx)
+        result = load_heterophilic_data(dataset_str, split_idx=split_idx)
     elif dataset_str in ['actor']:
-        return load_actor_data(split_idx=split_idx)
+        result = load_actor_data(split_idx=split_idx)
     elif dataset_str in ['ogbn-arxiv', 'arxiv']:
-        return load_ogb_arxiv()
+        result = load_ogb_arxiv()
     else:
         # Original loading logic for cora, citeseer, pubmed
-        return load_planetoid_data(dataset_str)
+        result = load_planetoid_data(dataset_str)
+    
+    # Optionally concatenate positional encoding
+    if use_pe:
+        result = _add_positional_encoding(result, dataset_str, pe_dim)
+    
+    return result
+
+
+def _add_positional_encoding(data_tuple, dataset_str, pe_dim=16):
+    """
+    Add positional encoding to features.
+    
+    Args:
+        data_tuple: Tuple returned by load_*_data functions
+        dataset_str: Dataset name for loading PE file
+        pe_dim: Expected PE dimension
+    
+    Returns:
+        Modified data_tuple with PE concatenated to features
+    """
+    adj, features, labels, y_train, y_val, y_test, train_mask, val_mask, test_mask, idx_train, idx_val, idx_test = data_tuple
+    
+    # Load PE
+    pe_path = f'./data/pe_rw_{dataset_str}.pt'
+    if not os.path.exists(pe_path):
+        raise FileNotFoundError(
+            f"Positional encoding file not found: {pe_path}\n"
+            f"Run: python features/generate_pe.py --dataset {dataset_str} --k {pe_dim}"
+        )
+    
+    pe_data = torch.load(pe_path)
+    pe = pe_data['pe']  # (N, k)
+    
+    print(f"Loading PE from {pe_path}, shape: {pe.shape}")
+    
+    # Convert features to dense if sparse
+    if sp.issparse(features):
+        features_dense = np.array(features.todense())
+    else:
+        features_dense = np.array(features)
+    
+    # Concatenate PE to features
+    pe_np = pe.numpy()
+    features_augmented = np.concatenate([features_dense, pe_np], axis=1)
+    
+    print(f"Original features: {features_dense.shape} -> Augmented: {features_augmented.shape}")
+    
+    # Convert back to sparse
+    features_augmented = sp.lil_matrix(features_augmented)
+    
+    return (adj, features_augmented, labels, y_train, y_val, y_test, 
+            train_mask, val_mask, test_mask, idx_train, idx_val, idx_test)
 
 
 def load_amazon_data(dataset_str):
