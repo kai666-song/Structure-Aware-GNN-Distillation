@@ -1,15 +1,12 @@
 # Core dependencies
-torch>=1.4.0
-numpy>=1.19.0
-scipy>=1.5.0
-networkx>=2.5
-
-# Graph Neural Networks
+torch>=1.10.0
 torch_geometric>=2.0.0
+numpy>=1.20.0
+scipy>=1.7.0
 
-# Visualization (optional)
-matplotlib>=3.3.0
+# Utilities
+tqdm>=4.60.0
+matplotlib>=3.4.0
+
+# Optional (for visualization)
 scikit-learn>=0.24.0
-
-# Statistical analysis
-# scipy already included above

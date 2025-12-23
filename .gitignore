@@ -6,8 +6,8 @@
 *.pyd
 __pycache__/
 
-# Model checkpoints
-.checkpoints/
+# Model checkpoints (large files)
+checkpoints/
 
 # Editor temporaries
 *.swn
@@ -26,6 +26,7 @@ data/coauthor/
 data/actor/
 data/heterophilic/
 data/ogb/
+data/cora/
 
 # Logs
 *.log
@@ -40,4 +41,11 @@ env/
 
 # OS files
 Thumbs.db
+
+# Large binary files (keep code, not weights)
+*.pt
+*.pth
+!data/pe_rw_*.pt
+!data/homophily_weights_*.pt
+!data/teacher_logits_*.pt
 
