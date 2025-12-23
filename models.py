@@ -407,3 +407,241 @@ class GCNIIWrapper(nn.Module):
         else:
             edge_index = convert_adj_to_edge_index(adj_or_edge_index)
         return self.gcnii(x, edge_index)
+
+
+# ============================================================================
+# Enhanced MLP for Structure-Aware Knowledge Distillation (Phase 3)
+# ============================================================================
+
+class EnhancedMLP(nn.Module):
+    """
+    Structure-Enhanced MLP Student for Spectral KD.
+    
+    Key innovations:
+    1. Feature Fusion Layer: LayerNorm to handle heterogeneous features
+       (sparse semantic features + dense positional encoding)
+    2. Residual Connections: Preserve high-frequency information
+    3. Deeper Architecture: 3-4 layers to digest structural information
+    
+    Architecture:
+        Input (X || PE) -> LayerNorm -> Linear -> LayerNorm -> ReLU -> Dropout
+        -> [Residual Block] x (num_layers - 2)
+        -> Linear -> Output
+    
+    Args:
+        nfeat: Input feature dimension (original features + PE)
+        nhid: Hidden dimension
+        nclass: Number of output classes
+        dropout: Dropout rate
+        num_layers: Total number of layers (default: 3)
+        use_residual: Whether to use residual connections (default: True)
+        norm_type: 'layer' or 'batch' normalization (default: 'layer')
+    """
+    
+    def __init__(self, nfeat, nhid, nclass, dropout, 
+                 num_layers=3, use_residual=True, norm_type='layer'):
+        super(EnhancedMLP, self).__init__()
+        
+        self.num_layers = num_layers
+        self.dropout = dropout
+        self.use_residual = use_residual
+        self.norm_type = norm_type
+        
+        # Input fusion layer with normalization
+        # Critical for handling heterogeneous features (sparse + dense)
+        self.input_norm = self._get_norm(nfeat, norm_type)
+        self.fc_in = nn.Linear(nfeat, nhid)
+        self.norm_in = self._get_norm(nhid, norm_type)
+        
+        # Residual blocks for hidden layers
+        self.res_blocks = nn.ModuleList()
+        for _ in range(num_layers - 2):
+            self.res_blocks.append(
+                ResidualBlock(nhid, dropout, norm_type)
+            )
+        
+        # Output layer
+        self.fc_out = nn.Linear(nhid, nclass)
+        
+        # Initialize weights
+        self._init_weights()
+        
+    def _get_norm(self, dim, norm_type):
+        """Get normalization layer."""
+        if norm_type == 'layer':
+            return nn.LayerNorm(dim)
+        elif norm_type == 'batch':
+            return nn.BatchNorm1d(dim)
+        else:
+            return nn.Identity()
+    
+    def _init_weights(self):
+        """Initialize weights with Xavier/Glorot."""
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+    
+    def forward(self, x, adj=None):
+        """
+        Forward pass.
+        
+        Args:
+            x: Input features (N, nfeat) - can include PE
+            adj: Adjacency matrix (unused, for interface compatibility)
+        
+        Returns:
+            logits: Output logits (N, nclass)
+        """
+        # Handle sparse input
+        if x.is_sparse:
+            x = x.to_dense()
+        x = x.float()
+        
+        # Input normalization (critical for feature fusion)
+        x = self.input_norm(x)
+        
+        # Input projection
+        x = self.fc_in(x)
+        x = self.norm_in(x)
+        x = F.relu(x)
+        x = F.dropout(x, self.dropout, training=self.training)
+        
+        # Residual blocks
+        for res_block in self.res_blocks:
+            x = res_block(x)
+        
+        # Output
+        logits = self.fc_out(x)
+        
+        return logits
+    
+    def get_features(self, x, adj=None):
+        """
+        Get intermediate features (before output layer).
+        Useful for feature analysis and visualization.
+        """
+        if x.is_sparse:
+            x = x.to_dense()
+        x = x.float()
+        
+        x = self.input_norm(x)
+        x = self.fc_in(x)
+        x = self.norm_in(x)
+        x = F.relu(x)
+        x = F.dropout(x, self.dropout, training=self.training)
+        
+        for res_block in self.res_blocks:
+            x = res_block(x)
+        
+        return x
+
+
+class ResidualBlock(nn.Module):
+    """
+    Residual block for EnhancedMLP.
+    
+    x_out = x + MLP(x)
+    
+    This preserves high-frequency information through skip connections,
+    which is critical for heterophilic graphs.
+    """
+    
+    def __init__(self, dim, dropout, norm_type='layer'):
+        super(ResidualBlock, self).__init__()
+        
+        self.fc1 = nn.Linear(dim, dim)
+        self.fc2 = nn.Linear(dim, dim)
+        self.dropout = dropout
+        
+        if norm_type == 'layer':
+            self.norm1 = nn.LayerNorm(dim)
+            self.norm2 = nn.LayerNorm(dim)
+        elif norm_type == 'batch':
+            self.norm1 = nn.BatchNorm1d(dim)
+            self.norm2 = nn.BatchNorm1d(dim)
+        else:
+            self.norm1 = nn.Identity()
+            self.norm2 = nn.Identity()
+    
+    def forward(self, x):
+        """
+        Forward with residual connection.
+        """
+        residual = x
+        
+        x = self.fc1(x)
+        x = self.norm1(x)
+        x = F.relu(x)
+        x = F.dropout(x, self.dropout, training=self.training)
+        
+        x = self.fc2(x)
+        x = self.norm2(x)
+        
+        # Residual connection
+        x = x + residual
+        x = F.relu(x)
+        x = F.dropout(x, self.dropout, training=self.training)
+        
+        return x
+
+
+class ResMLP(nn.Module):
+    """
+    Simple Residual MLP - Lightweight version.
+    
+    A simpler alternative to EnhancedMLP with direct residual connections.
+    
+    Architecture:
+        x -> Linear -> Norm -> ReLU -> Dropout -> Linear -> (+x) -> Output
+    
+    Args:
+        nfeat: Input feature dimension
+        nhid: Hidden dimension
+        nclass: Number of classes
+        dropout: Dropout rate
+        num_layers: Number of residual layers
+    """
+    
+    def __init__(self, nfeat, nhid, nclass, dropout, num_layers=2):
+        super(ResMLP, self).__init__()
+        
+        self.dropout = dropout
+        
+        # Input projection (handles dimension mismatch)
+        self.fc_in = nn.Linear(nfeat, nhid)
+        self.ln_in = nn.LayerNorm(nhid)
+        
+        # Residual layers
+        self.layers = nn.ModuleList()
+        self.norms = nn.ModuleList()
+        for _ in range(num_layers):
+            self.layers.append(nn.Linear(nhid, nhid))
+            self.norms.append(nn.LayerNorm(nhid))
+        
+        # Output
+        self.fc_out = nn.Linear(nhid, nclass)
+    
+    def forward(self, x, adj=None):
+        if x.is_sparse:
+            x = x.to_dense()
+        x = x.float()
+        
+        # Input projection
+        x = self.fc_in(x)
+        x = self.ln_in(x)
+        x = F.relu(x)
+        x = F.dropout(x, self.dropout, training=self.training)
+        
+        # Residual layers
+        for fc, ln in zip(self.layers, self.norms):
+            residual = x
+            x = fc(x)
+            x = ln(x)
+            x = F.relu(x)
+            x = x + residual  # Residual connection
+            x = F.dropout(x, self.dropout, training=self.training)
+        
+        # Output
+        return self.fc_out(x)

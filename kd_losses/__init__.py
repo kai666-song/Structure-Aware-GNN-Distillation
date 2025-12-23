@@ -11,3 +11,8 @@ from .topology_kd import (
     AdaptiveTopologyLoss, 
     HybridTopologyLoss
 )
+from .adaptive_kd import (
+    SpectralDecomposer,
+    AdaptiveSpectralKDLoss,
+    HybridAdaptiveLoss
+)
