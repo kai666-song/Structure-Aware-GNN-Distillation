@@ -9,6 +9,12 @@ Usage:
     python run_analysis.py --stronger_teacher       # Test GCNII as stronger teacher
     python run_analysis.py --figures                # Generate publication figures
     python run_analysis.py --feature                # Feature space analysis
+    
+    # Critical Validation (Red Team Defense)
+    python run_analysis.py --critical               # Run all critical validations
+    python run_analysis.py --vanilla                # Vanilla MLP baseline
+    python run_analysis.py --energy                 # Dirichlet Energy analysis
+    python run_analysis.py --gamma                  # Gamma sensitivity test
 """
 
 import argparse
@@ -27,6 +33,12 @@ def main():
     parser.add_argument('--figures', action='store_true', help='Generate publication figures')
     parser.add_argument('--feature', action='store_true', help='Feature space analysis')
     parser.add_argument('--all', action='store_true', help='Run all analyses')
+    
+    # Critical Validation (Red Team Defense)
+    parser.add_argument('--critical', action='store_true', help='Run all critical validations')
+    parser.add_argument('--vanilla', action='store_true', help='Vanilla MLP baseline experiment')
+    parser.add_argument('--energy', action='store_true', help='Dirichlet Energy analysis')
+    parser.add_argument('--gamma', action='store_true', help='Gamma (TCD weight) sensitivity')
     
     # Data options
     parser.add_argument('--data', type=str, default='actor', help='Dataset name')
@@ -118,6 +130,50 @@ def main():
             generate_all_figures()
         except Exception as e:
             print(f"Error: {e}")
+    
+    # Critical Validation Experiments (Red Team Defense)
+    if args.critical:
+        print("\n" + "="*70)
+        print("RUNNING ALL CRITICAL VALIDATIONS (RED TEAM DEFENSE)")
+        print("="*70)
+        from analysis.critical_validation import run_all_critical_validations
+        try:
+            run_all_critical_validations([args.data, 'cora'], args.num_runs, device)
+        except Exception as e:
+            print(f"Error: {e}")
+    
+    if args.vanilla:
+        print("\n" + "="*70)
+        print("RUNNING VANILLA MLP BASELINE")
+        print("="*70)
+        from analysis.critical_validation import run_vanilla_mlp_experiment
+        for dataset in datasets:
+            try:
+                run_vanilla_mlp_experiment(dataset, args.num_runs, device)
+            except Exception as e:
+                print(f"Error on {dataset}: {e}")
+    
+    if args.energy:
+        print("\n" + "="*70)
+        print("RUNNING DIRICHLET ENERGY ANALYSIS")
+        print("="*70)
+        from analysis.critical_validation import run_dirichlet_energy_experiment
+        for dataset in datasets:
+            try:
+                run_dirichlet_energy_experiment(dataset, args.num_runs, device)
+            except Exception as e:
+                print(f"Error on {dataset}: {e}")
+    
+    if args.gamma:
+        print("\n" + "="*70)
+        print("RUNNING GAMMA SENSITIVITY ANALYSIS")
+        print("="*70)
+        from analysis.critical_validation import run_gamma_sensitivity_experiment
+        for dataset in datasets:
+            try:
+                run_gamma_sensitivity_experiment(dataset, args.num_runs, device)
+            except Exception as e:
+                print(f"Error on {dataset}: {e}")
     
     print("\n" + "="*70)
     print("ALL ANALYSES COMPLETE!")
