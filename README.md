@@ -93,7 +93,25 @@
 git clone https://github.com/your-repo/GCN-with-Hinton-Knowledge-Distillation.git
 cd GCN-with-Hinton-Knowledge-Distillation
 pip install -r requirements.txt
+
+# Clone GloGNN for heterophilic data and splits
+git clone https://github.com/RecklessRonan/GloGNN.git ../GloGNN
 ```
+
+### Dataset Information
+
+| Dataset | Type | Nodes | Features | Classes | Source |
+|---------|------|-------|----------|---------|--------|
+| Actor | Heterophilic | 7,600 | 932 | 5 | GloGNN (Geom-GCN splits) |
+| Squirrel | Heterophilic | 5,201 | 2,089 | 5 | GloGNN (Geom-GCN splits) |
+| Chameleon | Heterophilic | 2,277 | 2,325 | 5 | GloGNN (Geom-GCN splits) |
+| Cora | Homophilic | 2,708 | 1,433 | 7 | PyTorch Geometric |
+| CiteSeer | Homophilic | 3,327 | 3,703 | 6 | PyTorch Geometric |
+| PubMed | Homophilic | 19,717 | 500 | 3 | PyTorch Geometric |
+
+**Data Download:**
+- Heterophilic datasets (Actor, Squirrel, Chameleon): Automatically loaded from [GloGNN repository](https://github.com/RecklessRonan/GloGNN)
+- Homophilic datasets (Cora, CiteSeer, PubMed): Automatically downloaded via PyTorch Geometric standard interfaces
 
 ### Reproduce Results
 
