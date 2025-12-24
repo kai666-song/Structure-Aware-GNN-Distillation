@@ -1,0 +1,33 @@
+{
+  "timestamp": "2025-12-24T17:41:50.996253",
+  "datasets": [
+    "actor",
+    "chameleon",
+    "squirrel"
+  ],
+  "task1_splits": {
+    "actor": {
+      "train_ratio": 0.48,
+      "val_ratio": 0.32,
+      "test_ratio": 0.2,
+      "passed": true
+    },
+    "chameleon": {
+      "train_ratio": 0.4795783926218709,
+      "val_ratio": 0.3201581027667984,
+      "test_ratio": 0.2002635046113307,
+      "passed": true
+    },
+    "squirrel": {
+      "train_ratio": 0.4799077100557585,
+      "val_ratio": 0.3199384733705057,
+      "test_ratio": 0.20015381657373582,
+      "passed": true
+    }
+  },
+  "task2_teacher": {
+    "actor": {
+      "mean": 37.40131578947368,
+      "std": 1.0419897929115502,
+      "target": 37.7,
+      "passed": 

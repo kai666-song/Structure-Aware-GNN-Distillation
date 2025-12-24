@@ -57,6 +57,8 @@ def load_teacher_logits(dataset, split_idx, data_dir='./data'):
         logits = torch.load(split_path)
         if isinstance(logits, dict):
             logits = logits.get('logits', logits.get('soft_labels', list(logits.values())[0]))
+        # Convert to float32 for consistency with student model
+        logits = logits.float()
         print(f"Loaded split-specific teacher logits from {split_path}")
         return logits
     
@@ -65,6 +67,8 @@ def load_teacher_logits(dataset, split_idx, data_dir='./data'):
     if os.path.exists(general_path):
         data = torch.load(general_path)
         logits = data.get('logits', data) if isinstance(data, dict) else data
+        # Convert to float32 for consistency with student model
+        logits = logits.float() if isinstance(logits, torch.Tensor) else torch.tensor(logits, dtype=torch.float32)
         print(f"Loaded general teacher logits from {general_path}")
         return logits
     
