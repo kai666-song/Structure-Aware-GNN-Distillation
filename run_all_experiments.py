@@ -98,23 +98,158 @@ def load_heterophilic_data(dataset, split_idx, device):
     }
 
 
+def load_planetoid_local(dataset, split_idx, device, data_dir='./data'):
+    """
+    Load Planetoid dataset (Cora, Citeseer, PubMed) from local files.
+    Uses the standard GCN paper format (ind.{dataset}.*)
+    """
+    import pickle
+    import scipy.sparse as sp
+    
+    def parse_index_file(filename):
+        index = []
+        for line in open(filename):
+            index.append(int(line.strip()))
+        return index
+    
+    def load_pickle(filename):
+        with open(filename, 'rb') as f:
+            try:
+                return pickle.load(f, encoding='latin1')
+            except:
+                f.seek(0)
+                return pickle.load(f)
+    
+    # Load all components
+    names = ['x', 'y', 'tx', 'ty', 'allx', 'ally', 'graph']
+    objects = []
+    for name in names:
+        filepath = os.path.join(data_dir, f'ind.{dataset}.{name}')
+        objects.append(load_pickle(filepath))
+    
+    x, y, tx, ty, allx, ally, graph = objects
+    
+    # Load test indices
+    test_idx_file = os.path.join(data_dir, f'ind.{dataset}.test.index')
+    test_idx_reorder = parse_index_file(test_idx_file)
+    test_idx_range = np.sort(test_idx_reorder)
+    
+    # Handle citeseer's isolated nodes
+    if dataset == 'citeseer':
+        test_idx_range_full = range(min(test_idx_reorder), max(test_idx_reorder) + 1)
+        tx_extended = sp.lil_matrix((len(test_idx_range_full), x.shape[1]))
+        tx_extended[test_idx_range - min(test_idx_range), :] = tx
+        tx = tx_extended
+        ty_extended = np.zeros((len(test_idx_range_full), y.shape[1]))
+        ty_extended[test_idx_range - min(test_idx_range), :] = ty
+        ty = ty_extended
+    
+    # Combine features
+    features = sp.vstack((allx, tx)).tolil()
+    features[test_idx_reorder, :] = features[test_idx_range, :]
+    features = features.toarray()
+    
+    # Normalize features
+    row_sum = features.sum(axis=1, keepdims=True)
+    row_sum[row_sum == 0] = 1
+    features = features / row_sum
+    
+    # Combine labels
+    labels = np.vstack((ally, ty))
+    labels[test_idx_reorder, :] = labels[test_idx_range, :]
+    labels = np.argmax(labels, axis=1)
+    
+    # Build adjacency matrix
+    num_nodes = features.shape[0]
+    adj = sp.lil_matrix((num_nodes, num_nodes))
+    for src, dsts in graph.items():
+        for dst in dsts:
+            adj[src, dst] = 1
+            adj[dst, src] = 1
+    
+    # Add self-loops and normalize
+    adj = adj + sp.eye(num_nodes)
+    rowsum = np.array(adj.sum(1)).flatten()
+    d_inv_sqrt = np.power(rowsum, -0.5)
+    d_inv_sqrt[np.isinf(d_inv_sqrt)] = 0.
+    d_mat_inv_sqrt = sp.diags(d_inv_sqrt)
+    adj = adj.dot(d_mat_inv_sqrt).transpose().dot(d_mat_inv_sqrt)
+    
+    # Convert to torch sparse
+    adj = adj.tocoo()
+    indices = torch.LongTensor(np.vstack((adj.row, adj.col)))
+    values = torch.FloatTensor(adj.data.astype(np.float32))
+    adj_tensor = torch.sparse_coo_tensor(indices, values, torch.Size(adj.shape))
+    
+    # Create random splits (60/20/20)
+    torch.manual_seed(42 + split_idx)
+    np.random.seed(42 + split_idx)
+    
+    num_train = int(0.6 * num_nodes)
+    num_val = int(0.2 * num_nodes)
+    
+    perm = torch.randperm(num_nodes)
+    train_mask = torch.zeros(num_nodes, dtype=torch.bool)
+    val_mask = torch.zeros(num_nodes, dtype=torch.bool)
+    test_mask = torch.zeros(num_nodes, dtype=torch.bool)
+    
+    train_mask[perm[:num_train]] = True
+    val_mask[perm[num_train:num_train+num_val]] = True
+    test_mask[perm[num_train+num_val:]] = True
+    
+    num_classes = int(labels.max()) + 1
+    num_features = features.shape[1]
+    
+    print(f"Dataset: {dataset}, Split: {split_idx}")
+    print(f"  Nodes: {num_nodes}, Features: {num_features}, Classes: {num_classes}")
+    print(f"  Train: {train_mask.sum().item()} ({100*train_mask.sum().item()/num_nodes:.1f}%)")
+    print(f"  Val:   {val_mask.sum().item()} ({100*val_mask.sum().item()/num_nodes:.1f}%)")
+    print(f"  Test:  {test_mask.sum().item()} ({100*test_mask.sum().item()/num_nodes:.1f}%)")
+    
+    return {
+        'features': torch.FloatTensor(features).to(device),
+        'labels': torch.LongTensor(labels).to(device),
+        'adj': adj_tensor.to(device),
+        'train_mask': train_mask.to(device),
+        'val_mask': val_mask.to(device),
+        'test_mask': test_mask.to(device),
+        'num_classes': num_classes,
+        'num_features': num_features,
+    }
+
+
 def load_homophilic_data(dataset, split_idx, device):
-    """Load homophilic dataset using PyG."""
+    """Load homophilic dataset using local files or PyG."""
+    import scipy.sparse as sp
+    
+    # First try to load from local data directory (same format as GCN paper)
+    local_data_dir = './data'
+    dataset_lower = dataset.lower()
+    
+    # Check if local data exists
+    local_file = os.path.join(local_data_dir, f'ind.{dataset_lower}.x')
+    
+    if os.path.exists(local_file):
+        # Load from local Planetoid format files
+        print(f"Loading {dataset} from local files...")
+        return load_planetoid_local(dataset_lower, split_idx, device, local_data_dir)
+    
+    # Fall back to PyG download
     try:
         from torch_geometric.datasets import Planetoid
         import torch_geometric.transforms as T
     except ImportError:
         raise ImportError("Please install torch_geometric: pip install torch_geometric")
     
-    # Load dataset
+    print(f"Downloading {dataset} via PyTorch Geometric...")
     root = './data/pyg'
     transform = T.NormalizeFeatures()
     
-    if dataset.lower() == 'cora':
+    if dataset_lower == 'cora':
         pyg_data = Planetoid(root=root, name='Cora', transform=transform)
-    elif dataset.lower() == 'citeseer':
+    elif dataset_lower == 'citeseer':
         pyg_data = Planetoid(root=root, name='CiteSeer', transform=transform)
-    elif dataset.lower() == 'pubmed':
+    elif dataset_lower == 'pubmed':
         pyg_data = Planetoid(root=root, name='PubMed', transform=transform)
     else:
         raise ValueError(f"Unknown homophilic dataset: {dataset}")

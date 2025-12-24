@@ -1,91 +1,63 @@
-# Knowledge Distillation for Heterophilic Graphs: GNN-to-MLP
+# Knowledge Distillation for Graph Neural Networks
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-1.10+-red.svg)](https://pytorch.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> **First systematic study of GNN-to-MLP knowledge distillation on heterophilic graphs. We demonstrate that a simple Hinton KD with proper hyperparameter tuning enables MLP students to surpass their GNN teachers.**
+> **First systematic study of GNN-to-MLP knowledge distillation on heterophilic graphs. Simple Hinton KD with proper hyperparameter tuning enables MLP students to match or surpass GNN teachers.**
 
 ---
 
-## 🎯 Key Findings
+## Main Results
 
-| Dataset | GLNN Baseline | Teacher (GloGNN++) | **Our Best** | Gap Closed |
-|---------|---------------|-------------------|--------------|------------|
-| Actor | 36.64% | 37.40% | **37.65% ± 0.98%** | **133.1%** |
-| Squirrel | 58.96% | 59.68% | **60.15% ± 1.57%** | **165.8%** |
+### Heterophilic Graphs (Main Contribution)
 
-**Highlights:**
-- ✅ Student MLP **surpasses** Teacher GNN (Gap Closed > 100%)
-- ✅ No message passing at inference time
-- ✅ Simple Hinton KD is sufficient - complex methods (PE, RKD) are harmful
-- ✅ First work to study GNN-to-MLP distillation on heterophilic graphs
+| Dataset | Teacher (GloGNN++) | Vanilla MLP | **Our Student** | Gap Closed |
+|---------|-------------------|-------------|-----------------|------------|
+| Actor | 37.74% | 35.22% | **37.53% ± 0.99%** | 91.7% |
+| Squirrel | 60.11% | 30.49% | **60.37% ± 1.78%** | **100.9%** |
+| Chameleon | 73.09% | 48.25% | **70.39% ± 1.53%** | 89.1% |
 
----
+### Homophilic Graphs (Sanity Check)
 
-## 📊 Main Results
+| Dataset | Teacher (GCN) | Vanilla MLP | **Our Student** |
+|---------|--------------|-------------|-----------------|
+| Cora | 87.68% | 75.08% | **88.12% ± 1.64%** |
+| CiteSeer | 76.85% | 72.15% | **77.34% ± 1.25%** |
+| PubMed | 86.62% | 88.09% | **89.17% ± 0.39%** |
 
-### Best Configuration
-
-| Dataset | Temperature (T) | λ_kd | Accuracy |
-|---------|-----------------|------|----------|
-| Actor | 8.0 | 10.0 | **37.65% ± 0.98%** |
-| Squirrel | 1.0 | 10.0 | **60.15% ± 1.57%** |
-
-### Comparison with Baselines
-
-| Method | Actor | Squirrel | Inference |
-|--------|-------|----------|-----------|
-| Vanilla MLP | 33.91% ± 0.78% | 30.29% ± 1.85% | No MP |
-| GLNN (T=4, λ=1) | 36.64% ± 0.43% | 58.96% ± 1.58% | No MP |
-| GloGNN++ (Teacher) | 37.40% ± 1.04% | 59.68% ± 1.75% | Message Passing |
-| **Ours (Tuned KD)** | **37.65% ± 0.98%** | **60.15% ± 1.57%** | No MP |
+**Key Findings:**
+- On Squirrel, Student **surpasses** Teacher (Gap Closed > 100%)
+- On all homophilic datasets, Student **surpasses** Teacher
+- Simple Hinton KD is sufficient - no need for complex methods
+- **4/6 datasets: Student > Teacher**
 
 ---
 
-## 🔬 Ablation Studies
+## Best Configurations
 
-### 1. Positional Encoding (PE) - Harmful ❌
-
-| Dataset | Without PE | With PE | Δ |
-|---------|------------|---------|---|
-| Actor | 36.28% | 35.28% | **-1.00%** |
-| Squirrel | 60.00% | 59.54% | **-0.46%** |
-
-**Conclusion:** RWPE introduces noise on heterophilic graphs. Do not use.
-
-### 2. Relational Knowledge Distillation (RKD) - Catastrophic Failure ❌
-
-| Dataset | GLNN Baseline | + RKD (any weight) |
-|---------|---------------|-------------------|
-| Actor | 36.64% | **11.05%** (collapse) |
-| Squirrel | 60.13% | **20.88%** (collapse) |
-
-**Conclusion:** RKD causes model collapse regardless of weight (tested 0.001 to 0.5). The geometric constraints are incompatible with GNN→MLP distillation.
-
-### 3. Temperature and λ_kd Tuning - Effective ✅
-
-**Actor Dataset:**
-| Config | Accuracy |
-|--------|----------|
-| T=4, λ=1 (default) | 36.42% |
-| T=8, λ=5 | 36.99% |
-| **T=8, λ=10** | **37.65%** |
-
-**Squirrel Dataset:**
-| Config | Accuracy |
-|--------|----------|
-| T=4, λ=1 (default) | 59.37% |
-| T=1, λ=5 | 59.80% |
-| **T=1, λ=10** | **60.15%** |
-
-**Key Insight:** 
-- Actor needs **high temperature** (T=8) to soften logits
-- Squirrel needs **low temperature** (T=1) to preserve hard label information
+| Dataset | Type | Temperature (T) | Lambda |
+|---------|------|-----------------|--------|
+| Actor | Heterophilic | 8.0 | 10.0 |
+| Squirrel | Heterophilic | 1.0 | 10.0 |
+| Chameleon | Heterophilic | 1.0 | 5.0 |
+| Cora/CiteSeer/PubMed | Homophilic | 4.0 | 1.0 |
 
 ---
 
-## 🚀 Quick Start
+## Ablation Studies (Negative Results)
+
+| Method | Effect | Conclusion |
+|--------|--------|------------|
+| Positional Encoding (RWPE) | -1.0% on Actor | Harmful |
+| Relational KD (RKD) | Model collapse (~11%) | Catastrophic |
+| Feature-based RKD | Model collapse (~11%) | Catastrophic |
+
+**Conclusion:** Complex methods fail. Simple Hinton KD + hyperparameter tuning is the best approach.
+
+---
+
+## Quick Start
 
 ### Installation
 
@@ -111,91 +83,87 @@ git clone https://github.com/RecklessRonan/GloGNN.git ../GloGNN
 
 **Data Download:**
 - Heterophilic datasets (Actor, Squirrel, Chameleon): Automatically loaded from [GloGNN repository](https://github.com/RecklessRonan/GloGNN)
-- Homophilic datasets (Cora, CiteSeer, PubMed): Automatically downloaded via PyTorch Geometric standard interfaces
+- Homophilic datasets (Cora, CiteSeer, PubMed): Automatically downloaded via PyTorch Geometric standard interfaces, or loaded from local `data/` directory
 
 ### Reproduce Results
 
 ```bash
-# Step 1: Verify teacher model
-python baselines/verify_glognn_teacher.py --all --device cuda
+# Run all 6 datasets
+python run_all_experiments.py --mode all --device cuda
 
-# Step 2: Run GLNN baseline
-python baselines/glnn_baseline.py --all --device cuda
-
-# Step 3: Run best configuration
-python train_best_config.py --device cuda
+# Or run separately
+python run_all_experiments.py --mode heterophilic --device cuda
+python run_all_experiments.py --mode homophilic --device cuda
 ```
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
-├── train_best_config.py      # Main script for best results
+├── run_all_experiments.py    # Main script for all 6 datasets
+├── train_best_config.py      # Hyperparameter search
 ├── train_rkd.py              # RKD experiments (negative results)
-├── train_phase4_rkd.py       # Feature-based RKD (negative results)
+├── models.py                 # Model definitions
+├── layers.py                 # Layer definitions
 │
 ├── baselines/
 │   ├── verify_glognn_teacher.py  # Teacher verification
-│   ├── glnn_baseline.py          # GLNN baseline
-│   └── save_teacher_features.py  # Extract teacher features
-│
-├── configs/
-│   └── experiment_config.py      # Hyperparameters
+│   ├── save_teacher_logits.py    # Save teacher logits
+│   └── glnn_baseline.py          # GLNN baseline
 │
 ├── results/
-│   ├── phase3_final/             # Best config results
-│   └── phase3_rkd/               # RKD ablation results
+│   ├── RESULTS.md                # Detailed results
+│   └── final/                    # Final experiment results (JSON)
 │
-└── checkpoints/                  # Teacher logits and features
+├── data/                         # Dataset files
+│   ├── ind.cora.*                # Cora dataset
+│   ├── ind.citeseer.*            # CiteSeer dataset
+│   ├── ind.pubmed.*              # PubMed dataset
+│   └── heterophilic/             # Heterophilic datasets
+│
+└── checkpoints/                  # Teacher logits
 ```
 
 ---
 
-## 📖 Method
+## Method
 
 ### Loss Function
 
 Simple Hinton Knowledge Distillation:
 
 ```
-L_total = L_CE(y, ŷ) + λ_kd × T² × KL(softmax(z_s/T) || softmax(z_t/T))
+L_total = L_CE(y, y_hat) + lambda_kd * T^2 * KL(softmax(z_s/T) || softmax(z_t/T))
 ```
 
 Where:
 - `L_CE`: Cross-entropy loss on hard labels
 - `KL`: KL divergence between student and teacher soft labels
 - `T`: Temperature (controls softness of probability distribution)
-- `λ_kd`: Weight for distillation loss
-
-### Why Simple KD Works
-
-1. **Soft labels provide richer supervision** than hard labels
-2. **Temperature scaling** reveals inter-class relationships
-3. **No structural constraints** allows MLP to find its own optimal representation
-4. **Heterophilic graphs benefit from soft targets** because neighboring nodes have different labels
+- `lambda_kd`: Weight for distillation loss
 
 ---
 
-## 📚 Citation
+## Citation
 
 ```bibtex
 @article{kd_heterophilic_graphs,
-  title={Knowledge Distillation for Heterophilic Graphs: When Simple is Better},
+  title={Knowledge Distillation for Heterophilic Graphs},
   author={Your Name},
-  year={2024}
+  year={2025}
 }
 ```
 
 ---
 
-## 📄 License
+## License
 
 MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [GloGNN](https://github.com/RecklessRonan/GloGNN) for teacher model and data splits
 - [GLNN](https://github.com/snap-stanford/graphless-neural-networks) for distillation framework
