@@ -1,0 +1,196 @@
+{
+  "actor": {
+    "\u03bb_rkd=0.0": {
+      "mean": 37.35526315789474,
+      "std": 0.9148285945141393,
+      "config": {
+        "temperature": 8.0,
+        "lambda_kd": 10.0,
+        "lambda_rkd": 0.0,
+        "lambda_dist": 1.0,
+        "lambda_angle": 1.0,
+        "student_hidden": 64,
+        "num_layers": 2,
+        "dropout": 0.5,
+        "lr": 0.01,
+        "weight_decay": 0.0005,
+        "epochs": 500,
+        "patience": 100,
+        "rkd_samples": 512
+      }
+    },
+    "\u03bb_rkd=0.001": {
+      "mean": 11.052631578947368,
+      "std": 0.4798574349686966,
+      "config": {
+        "temperature": 8.0,
+        "lambda_kd": 10.0,
+        "lambda_rkd": 0.001,
+        "lambda_dist": 1.0,
+        "lambda_angle": 1.0,
+        "student_hidden": 64,
+        "num_layers": 2,
+        "dropout": 0.5,
+        "lr": 0.01,
+        "weight_decay": 0.0005,
+        "epochs": 500,
+        "patience": 100,
+        "rkd_samples": 512
+      }
+    },
+    "\u03bb_rkd=0.01": {
+      "mean": 11.052631578947368,
+      "std": 0.4798574349686966,
+      "config": {
+        "temperature": 8.0,
+        "lambda_kd": 10.0,
+        "lambda_rkd": 0.01,
+        "lambda_dist": 1.0,
+        "lambda_angle": 1.0,
+        "student_hidden": 64,
+        "num_layers": 2,
+        "dropout": 0.5,
+        "lr": 0.01,
+        "weight_decay": 0.0005,
+        "epochs": 500,
+        "patience": 100,
+        "rkd_samples": 512
+      }
+    },
+    "\u03bb_rkd=0.1": {
+      "mean": 11.052631578947368,
+      "std": 0.4798574349686966,
+      "config": {
+        "temperature": 8.0,
+        "lambda_kd": 10.0,
+        "lambda_rkd": 0.1,
+        "lambda_dist": 1.0,
+        "lambda_angle": 1.0,
+        "student_hidden": 64,
+        "num_layers": 2,
+        "dropout": 0.5,
+        "lr": 0.01,
+        "weight_decay": 0.0005,
+        "epochs": 500,
+        "patience": 100,
+        "rkd_samples": 512
+      }
+    },
+    "\u03bb_rkd=0.5": {
+      "mean": 11.052631578947368,
+      "std": 0.4798574349686966,
+      "config": {
+        "temperature": 8.0,
+        "lambda_kd": 10.0,
+        "lambda_rkd": 0.5,
+        "lambda_dist": 1.0,
+        "lambda_angle": 1.0,
+        "student_hidden": 64,
+        "num_layers": 2,
+        "dropout": 0.5,
+        "lr": 0.01,
+        "weight_decay": 0.0005,
+        "epochs": 500,
+        "patience": 100,
+        "rkd_samples": 512
+      }
+    }
+  },
+  "squirrel": {
+    "\u03bb_rkd=0.0": {
+      "mean": 61.57540826128722,
+      "std": 0.901136553280198,
+      "config": {
+        "temperature": 1.0,
+        "lambda_kd": 10.0,
+        "lambda_rkd": 0.0,
+        "lambda_dist": 1.0,
+        "lambda_angle": 1.0,
+        "student_hidden": 64,
+        "num_layers": 2,
+        "dropout": 0.5,
+        "lr": 0.01,
+        "weight_decay": 0.0005,
+        "epochs": 500,
+        "patience": 100,
+        "rkd_samples": 512
+      }
+    },
+    "\u03bb_rkd=0.001": {
+      "mean": 20.883765609990395,
+      "std": 0.7126700092599975,
+      "config": {
+        "temperature": 1.0,
+        "lambda_kd": 10.0,
+        "lambda_rkd": 0.001,
+        "lambda_dist": 1.0,
+        "lambda_angle": 1.0,
+        "student_hidden": 64,
+        "num_layers": 2,
+        "dropout": 0.5,
+        "lr": 0.01,
+        "weight_decay": 0.0005,
+        "epochs": 500,
+        "patience": 100,
+        "rkd_samples": 512
+      }
+    },
+    "\u03bb_rkd=0.01": {
+      "mean": 20.883765609990395,
+      "std": 0.7126700092599975,
+      "config": {
+        "temperature": 1.0,
+        "lambda_kd": 10.0,
+        "lambda_rkd": 0.01,
+        "lambda_dist": 1.0,
+        "lambda_angle": 1.0,
+        "student_hidden": 64,
+        "num_layers": 2,
+        "dropout": 0.5,
+        "lr": 0.01,
+        "weight_decay": 0.0005,
+        "epochs": 500,
+        "patience": 100,
+        "rkd_samples": 512
+      }
+    },
+    "\u03bb_rkd=0.1": {
+      "mean": 20.883765609990395,
+      "std": 0.7126700092599975,
+      "config": {
+        "temperature": 1.0,
+        "lambda_kd": 10.0,
+        "lambda_rkd": 0.1,
+        "lambda_dist": 1.0,
+        "lambda_angle": 1.0,
+        "student_hidden": 64,
+        "num_layers": 2,
+        "dropout": 0.5,
+        "lr": 0.01,
+        "weight_decay": 0.0005,
+        "epochs": 500,
+        "patience": 100,
+        "rkd_samples": 512
+      }
+    },
+    "\u03bb_rkd=0.5": {
+      "mean": 20.883765609990395,
+      "std": 0.7126700092599975,
+      "config": {
+        "temperature": 1.0,
+        "lambda_kd": 10.0,
+        "lambda_rkd": 0.5,
+        "lambda_dist": 1.0,
+        "lambda_angle": 1.0,
+        "student_hidden": 64,
+        "num_layers": 2,
+        "dropout": 0.5,
+        "lr": 0.01,
+        "weight_decay": 0.0005,
+        "epochs": 500,
+        "patience": 100,
+        "rkd_samples": 512
+      }
+    }
+  }
+}

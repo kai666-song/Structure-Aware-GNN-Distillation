@@ -45,7 +45,7 @@ Thumbs.db
 # Large binary files (keep code, not weights)
 *.pt
 *.pth
-!data/pe_rw_*.pt
-!data/homophily_weights_*.pt
-!data/teacher_logits_*.pt
+
+# Keep results JSON files
+!results/**/*.json
 
