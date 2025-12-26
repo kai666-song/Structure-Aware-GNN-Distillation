@@ -27,6 +27,7 @@ data/actor/
 data/heterophilic/
 data/ogb/
 data/cora/
+data/pyg/
 
 # Logs
 *.log
@@ -48,4 +49,7 @@ Thumbs.db
 
 # Keep results JSON files
 !results/**/*.json
+
+# Archive directory (intermediate experiments)
+archive/
 

@@ -1,18 +1,19 @@
-from .st import SoftTarget
-from .rkd import RKDLoss, RKDDistanceLoss, AdaptiveRKDLoss, BatchRKDLoss
-from .topology_kd import (
-    ContrastiveTopologyLoss, 
-    SoftTopologyLoss, 
-    AttentionDistillationLoss,
-    HybridContrastiveLoss,
-    GraphMixup,
-    # Backward compatibility aliases
-    TopologyConsistencyLoss,
-    AdaptiveTopologyLoss, 
-    HybridTopologyLoss
-)
+# Gated Adaptive Frequency-Decoupled Knowledge Distillation
+# Core implementation for heterophilic graph distillation
+
 from .adaptive_kd import (
-    SpectralDecomposer,
-    AdaptiveSpectralKDLoss,
-    HybridAdaptiveLoss
+    # Bernstein polynomial spectral filters
+    BernsteinBasis,
+    LearnableBernsteinFilter,
+    
+    # AFD Loss components
+    AFDLoss,
+    MultiBandAFDLoss,
+    HybridAFDLoss,
+    
+    # Gated mechanism (main contribution)
+    NodeHomophilyComputer,
+    GatedFrequencyFusion,
+    GatedAFDLoss,
+    DualPathGatedLoss,
 )
