@@ -94,7 +94,35 @@ python analysis/deep_mechanism_analysis.py
 │
 ├── checkpoints/                  # Saved model checkpoints
 ├── results/                      # Experiment results
-└── figures/                      # Generated figures
+└── figures/
+    └── paper/                    # Paper figures (generated)
+```
+
+---
+
+## Paper Figures
+
+Generate all paper figures with:
+
+```bash
+python scripts/generate_paper_figures.py --all
+```
+
+| Figure | Description | File |
+|--------|-------------|------|
+| Fig 1 | Motivation: Heterophily Challenge | `fig1_motivation.pdf` |
+| Fig 2 | Main Results Comparison | `fig2_main_results.pdf` |
+| Fig 3 | Spectral Response (θ_k) | `fig3_spectral_response.pdf` |
+| Fig 4 | Parameter Sensitivity | `fig4_sensitivity.pdf` |
+| Fig 5 | Ablation Study | `fig5_ablation.pdf` |
+| Fig 6 | Efficiency Analysis | `fig6_efficiency.pdf` |
+| Fig 7 | t-SNE Visualization | `fig7_tsne.pdf` |
+| Fig 8 | Homophily Breakdown | `fig8_homophily_breakdown.pdf` |
+
+For figures with real model data (θ_k from trained model, t-SNE from features):
+
+```bash
+python scripts/extract_and_plot.py --dataset chameleon
 ```
 
 ---
